@@ -23,7 +23,7 @@ public class EndpointsTest {
     @BeforeEach
     public void setUp() {
 	ChatGPT llm = Mockito.mock(ChatGPT.class);
-	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyInt())).thenReturn("result");
+	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn("result");
 	app = new SmallvilleServer(new Analytics(), llm, new World()).server();
     }
 
@@ -81,6 +81,36 @@ public class EndpointsTest {
 
 	    assertEquals(response.code(), 200);
 	    assertNotNull(body.get("agents"));
+	});
+    }
+
+    @Test
+    public void GET_world_returns_snapshot_for_visual_inspection() {
+	JavalinTest.test(app, (server, client) -> {
+	    Response response = client.get("/world");
+	    JSONObject body = new JSONObject(response.body().string());
+
+	    assertEquals(response.code(), 200);
+	    assertNotNull(body.get("time"));
+	    assertNotNull(body.get("step"));
+	    assertNotNull(body.get("locations"));
+	    assertNotNull(body.get("agents"));
+	    assertNotNull(body.get("actionLog"));
+	    assertNotNull(body.get("worldBuilding"));
+	    assertNotNull(body.get("dailyRhythm"));
+	    assertNotNull(body.get("pendingProposals"));
+	});
+    }
+
+    @Test
+    public void GET_models_returns_runtime_model_state() {
+	JavalinTest.test(app, (server, client) -> {
+	    Response response = client.get("/models");
+	    JSONObject body = new JSONObject(response.body().string());
+
+	    assertEquals(response.code(), 200);
+	    assertNotNull(body.get("providerMode"));
+	    assertNotNull(body.get("availableModels"));
 	});
     }
 

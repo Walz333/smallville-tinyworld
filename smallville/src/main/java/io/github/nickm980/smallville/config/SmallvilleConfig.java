@@ -43,24 +43,32 @@ public class SmallvilleConfig {
     }
 
     private static InputStream loadInputStream(String path) {
-	Path file = Paths.get(path);
+	Path[] candidates = new Path[] { Paths.get(path), Paths.get("src", "main", "resources", path),
+		Paths.get("smallville", "src", "main", "resources", path) };
 
 	InputStream inputStream = null;
 
-	if (Files.exists(file)) {
-	    LOG.debug("Configuration file found");
+	for (Path file : candidates) {
+	    if (!Files.exists(file)) {
+		continue;
+	    }
+
+	    LOG.debug("Configuration file found at {}", file.toAbsolutePath());
 	    try {
 		inputStream = Files.newInputStream(file);
+		break;
 	    } catch (IOException e) {
 		e.printStackTrace();
 	    }
-	} else {
-	    LOG.debug("Loading default configuration");
-	    inputStream = SmallvilleConfig.class.getResourceAsStream("/" + file);
 	}
 
 	if (inputStream == null) {
-	    LOG.error("No " + file + " found. It must be either in resources folder or next to jar");
+	    LOG.debug("Loading default configuration");
+	    inputStream = SmallvilleConfig.class.getResourceAsStream("/" + path);
+	}
+
+	if (inputStream == null) {
+	    LOG.error("No {} found. It must be either in resources folder or next to jar", path);
 	}
 
 	return inputStream;
@@ -81,7 +89,7 @@ public class SmallvilleConfig {
 	return result;
     }
 
-    private static <T> T loadYamlFile(String file, Class<T> clazz) {
+    public static <T> T loadYamlFile(String file, Class<T> clazz) {
 	Yaml yaml = new Yaml();
 	InputStream stream = loadInputStream(file);
 	T result = yaml.loadAs(stream, clazz);

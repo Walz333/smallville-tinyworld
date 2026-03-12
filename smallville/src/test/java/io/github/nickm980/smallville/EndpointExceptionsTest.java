@@ -17,7 +17,7 @@ public class EndpointExceptionsTest {
     @BeforeEach
     public void setUp() {
 	ChatGPT llm = Mockito.mock(ChatGPT.class);
-	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyInt())).thenReturn("result");
+	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn("result");
 	app = new SmallvilleServer(new Analytics(), llm, new World()).server();
     }
 

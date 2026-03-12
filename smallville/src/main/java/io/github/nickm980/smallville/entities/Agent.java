@@ -1,5 +1,6 @@
 package io.github.nickm980.smallville.entities;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import io.github.nickm980.smallville.memory.Characteristic;
@@ -12,6 +13,11 @@ public class Agent {
     private ActionHistory currentAction;
     private Location location;
     private String traits;
+    private String model;
+    private String socialPreference = "balanced";
+    private boolean canProposeWorldChanges;
+    private List<String> goals = new ArrayList<String>();
+    private List<String> rituals = new ArrayList<String>();
     
     public Agent(String name, List<Characteristic> characteristics, String currentAction, Location location) {
 	this.name = name;
@@ -64,5 +70,44 @@ public class Agent {
     public String getTraits() {
 	return traits;
     }
-    
+
+    public String getModel() {
+	return model;
+    }
+
+    public void setModel(String model) {
+	this.model = model;
+    }
+
+    public String getSocialPreference() {
+	return socialPreference;
+    }
+
+    public void setSocialPreference(String socialPreference) {
+	this.socialPreference = socialPreference;
+    }
+
+    public boolean canProposeWorldChanges() {
+	return canProposeWorldChanges;
+    }
+
+    public void setCanProposeWorldChanges(boolean canProposeWorldChanges) {
+	this.canProposeWorldChanges = canProposeWorldChanges;
+    }
+
+    public List<String> getGoals() {
+	return goals;
+    }
+
+    public void setGoals(List<String> goals) {
+	this.goals = goals == null ? new ArrayList<String>() : new ArrayList<String>(goals);
+    }
+
+    public List<String> getRituals() {
+	return rituals;
+    }
+
+    public void setRituals(List<String> rituals) {
+	this.rituals = rituals == null ? new ArrayList<String>() : new ArrayList<String>(rituals);
+    }
 }

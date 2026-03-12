@@ -87,6 +87,38 @@ public final class SimulationController {
 			analytics.getPromptHistory(), "locationVisits", analytics.getVisits()));
     }
 
+    @Get("/world")
+    public void getWorld(Context ctx) {
+	ctx.json(service.getWorldSnapshot());
+    }
+
+    @Get("/world/proposals")
+    public void getWorldProposals(Context ctx) {
+	ctx.json(Map.of("proposals", service.getWorldProposals()));
+    }
+
+    @Post("/world/proposals/{id}/approve")
+    public void approveWorldProposal(Context ctx) {
+	ctx.json(Map.of("success", true, "proposal", service.approveWorldProposal(ctx.pathParam("id"))));
+    }
+
+    @Post("/world/proposals/{id}/reject")
+    public void rejectWorldProposal(Context ctx) {
+	ctx.json(Map.of("success", true, "proposal", service.rejectWorldProposal(ctx.pathParam("id"))));
+    }
+
+    @Get("/models")
+    public void getModels(Context ctx) {
+	ctx.json(service.getModels());
+    }
+
+    @Post("/models/default")
+    public void setDefaultModel(Context ctx) {
+	SetDefaultModelRequest request = ctx.bodyAsClass(SetDefaultModelRequest.class);
+	service.setDefaultModel(request);
+	ctx.json(Map.of("success", true));
+    }
+
     @Get("/agents")
     public void getAgents(Context ctx) {
 	ctx.json(Map.of("agents", service.getAgents()));
@@ -121,6 +153,19 @@ public final class SimulationController {
 	    .get();
 
 	service.createAgent(request);
+	ctx.json(Map.of("success", true));
+    }
+
+    @Post("/agents/import")
+    public void importAgents(Context ctx) {
+	ImportAgentsRequest request = ctx.bodyAsClass(ImportAgentsRequest.class);
+	ctx.json(service.importAgents(request));
+    }
+
+    @Post("/agents/{name}/model")
+    public void setAgentModel(Context ctx) {
+	SetAgentModelRequest request = ctx.bodyAsClass(SetAgentModelRequest.class);
+	service.setAgentModel(ctx.pathParam("name"), request);
 	ctx.json(Map.of("success", true));
     }
 
