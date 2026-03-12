@@ -69,7 +69,7 @@ public final class SmallvilleMath {
      * @return Normalized value between 0 and 1 where 1 is an identical
      */
     public static double calculateSentenceSimilarity(String a, String b) {
-	if (a.isEmpty() || b.isEmpty()) {
+	if (a == null || b == null || a.isBlank() || b.isBlank()) {
 	    return 0.0;
 	}
 	if (getBert() == null) {

@@ -8,7 +8,9 @@ import java.nio.file.Paths;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,31 +77,45 @@ public class SmallvilleConfig {
     }
 
     private static JsonNode loadJsonFile(String file) {
-	InputStream stream = loadInputStream(file);
 	ObjectMapper mapper = new ObjectMapper();
-	JsonNode result = null;
-	
-	try {
-	    result = mapper.readTree(stream);
-	    stream.close();
+	try (InputStream stream = loadInputStream(file)) {
+	    if (stream == null) {
+		return null;
+	    }
+	    return mapper.readTree(stream);
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
 
-	return result;
+	return null;
     }
 
     public static <T> T loadYamlFile(String file, Class<T> clazz) {
-	Yaml yaml = new Yaml();
-	InputStream stream = loadInputStream(file);
-	T result = yaml.loadAs(stream, clazz);
-
-	try {
-	    stream.close();
+	try (InputStream stream = loadInputStream(file)) {
+	    if (stream == null) {
+		return null;
+	    }
+	    return createYaml(clazz).loadAs(stream, clazz);
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
 
-	return result;
+	return null;
+    }
+
+    public static <T> T parseYaml(String content, Class<T> clazz) {
+	if (content == null || content.isBlank()) {
+	    return null;
+	}
+
+	return createYaml(clazz).loadAs(content, clazz);
+    }
+
+    private static <T> Yaml createYaml(Class<T> clazz) {
+	LoaderOptions loaderOptions = new LoaderOptions();
+	loaderOptions.setAllowDuplicateKeys(false);
+	loaderOptions.setMaxAliasesForCollections(25);
+	loaderOptions.setCodePointLimit(1_000_000);
+	return new Yaml(new Constructor(clazz, loaderOptions));
     }
 }

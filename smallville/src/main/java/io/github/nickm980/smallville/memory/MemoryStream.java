@@ -41,36 +41,12 @@ public class MemoryStream {
      * @return
      */
     public List<Memory> getRelevantMemories(String query, int minImportance) {
-	// score, memory index
-	Map<Double, Integer> scores = new HashMap<Double, Integer>();
-
-	for (Memory memory : memories) {
-	    if (memory.getImportance() >= minImportance) {
-		double score = memory.getScore(query);
-		scores.put(score, memories.indexOf(memory));
-	    }
-	}
-
-	List<Double> keys = new ArrayList<Double>(scores.keySet());
-	Collections.sort(keys);
-
-	List<Integer> indices = scores.values().stream().collect(Collectors.toList());
-
-	if (scores.size() > 3) {
-	    double first = keys.get(keys.size() - 1);
-	    double second = keys.get(keys.size() - 2);
-	    double third = keys.get(keys.size() - 3);
-
-	    indices = List.of(scores.get(first), scores.get(second), scores.get(third));
-	}
-
-	List<Memory> memCopies = new ArrayList<Memory>();
-
-	for (int index : indices) {
-	    memCopies.add(memories.get(index));
-	}
-
-	return memCopies;
+	return memories
+	    .stream()
+	    .filter(memory -> memory.getImportance() >= minImportance)
+	    .sorted(Comparator.comparingDouble((Memory memory) -> memory.getScore(query)).reversed())
+	    .limit(3)
+	    .collect(Collectors.toList());
     }
 
     public List<Memory> getUnweightedMemories() {

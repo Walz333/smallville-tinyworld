@@ -20,8 +20,6 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
-
 import io.github.nickm980.smallville.World;
 import io.github.nickm980.smallville.api.v1.dto.AgentStateResponse;
 import io.github.nickm980.smallville.api.v1.dto.ConversationResponse;
@@ -302,7 +300,7 @@ public class SimulationService {
 
 	SimulationFile importFile;
 	try {
-	    importFile = new Yaml().loadAs(request.getYaml(), SimulationFile.class);
+	    importFile = SmallvilleConfig.parseYaml(request.getYaml(), SimulationFile.class);
 	} catch (Exception e) {
 	    LOG.warn("Failed to parse agent import YAML.", e);
 	    response.setSuccess(false);
@@ -474,13 +472,27 @@ public class SimulationService {
 	return uuid;
     }
 
+    public boolean addMemory(UUID uuid, String memory) {
+	MemoryStream stream = memories.get(uuid);
+	if (stream == null || memory == null || memory.isBlank()) {
+	    return false;
+	}
+
+	stream.add(new Observation(memory));
+	return true;
+    }
+
     public List<String> getMemories(UUID uuid, String query) {
 	MemoryStream stream = memories.get(uuid);
 	if (stream == null) {
 	    return List.of();
 	}
 
-	return stream.getRelevantMemories(query).stream().map(Memory::getDescription).collect(Collectors.toList());
+	return stream
+	    .getRelevantMemories(query == null ? "" : query)
+	    .stream()
+	    .map(Memory::getDescription)
+	    .collect(Collectors.toList());
     }
 
     public WorldSnapshotResponse getWorldSnapshot() {

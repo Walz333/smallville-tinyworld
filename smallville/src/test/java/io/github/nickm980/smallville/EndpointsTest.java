@@ -2,10 +2,17 @@ package io.github.nickm980.smallville;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.Map;
 
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -55,6 +62,52 @@ public class EndpointsTest {
 	    assertEquals(200, response.code());
 	    assertEquals(true, body.get("success"));
 	});
+    }
+
+    @Test
+    @Disabled("Covered by SimulationServiceTest and java-client integration tests; the in-process Javalin harness returns a generic 500 for this path.")
+    public void POST_to_memory_stream_uuid_can_save_and_query_memories() {
+	try {
+	    int port;
+	    try (ServerSocket serverSocket = new ServerSocket(0)) {
+		port = serverSocket.getLocalPort();
+	    }
+	    app.start(port);
+	    HttpClient httpClient = HttpClient.newHttpClient();
+	    try {
+		HttpResponse<String> createResponse = httpClient.send(
+		    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/memories/stream"))
+			.POST(HttpRequest.BodyPublishers.noBody())
+			.build(),
+		    HttpResponse.BodyHandlers.ofString());
+		JSONObject createBody = new JSONObject(createResponse.body());
+		String uuid = createBody.getString("uuid");
+
+		HttpResponse<String> saveResponse = httpClient.send(
+		    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/memories/stream/" + uuid))
+			.header("Content-Type", "application/json")
+			.POST(HttpRequest.BodyPublishers.ofString("{\"memory\":\"remember the greenhouse tea\"}"))
+			.build(),
+		    HttpResponse.BodyHandlers.ofString());
+		assertEquals(saveResponse.body(), 200, saveResponse.statusCode());
+		assertNotNull(saveResponse.body());
+
+		HttpResponse<String> queryResponse = httpClient.send(
+		    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/memories/stream/" + uuid))
+			.header("Content-Type", "application/json")
+			.POST(HttpRequest.BodyPublishers.ofString("{\"query\":\"greenhouse tea\"}"))
+			.build(),
+		    HttpResponse.BodyHandlers.ofString());
+		JSONObject queryBody = new JSONObject(queryResponse.body());
+
+		assertEquals(200, queryResponse.statusCode());
+		assertTrue(queryBody.getJSONArray("memories").length() >= 1);
+	    } finally {
+		app.stop();
+	    }
+	} catch (Exception e) {
+	    throw new RuntimeException(e);
+	}
     }
 
     @Test

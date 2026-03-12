@@ -2,9 +2,12 @@ package io.github.nickm980.smallville.api.v1;
 
 import static io.github.nickm980.smallville.api.SmallvilleServer.exists;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,14 +60,48 @@ public final class SimulationController {
     @Post("/memories/stream/{uuid}")
     public void saveMemory(Context ctx, @Param String uuidStr) {
 	UUID uuid = UUID.fromString(uuidStr);
+	Map<String, String> dataMap = parseMemoryStreamPayload(ctx.body());
+	String memory = dataMap.get("memory");
+	String query = dataMap.get("query");
 
-	Map<String, String> dataMap = gson.fromJson(ctx.body(), new TypeToken<Map<String, String>>() {
-	}.getType());
-
-	String query = (String) dataMap.get("query");
+	if (exists(memory)) {
+	    boolean success = service.addMemory(uuid, memory);
+	    ctx.status(success ? 200 : 404).json(Map.of("success", success));
+	    return;
+	}
 
 	List<String> result = service.getMemories(uuid, query);
 	ctx.status(200).json(Map.of("success", true, "memories", result));
+    }
+
+    private Map<String, String> parseMemoryStreamPayload(String body) {
+	if (!exists(body)) {
+	    return Map.of();
+	}
+
+	try {
+	    JsonNode root = new ObjectMapper().readTree(body);
+	    Map<String, String> values = new HashMap<String, String>();
+	    if (root.hasNonNull("memory")) {
+		values.put("memory", root.get("memory").asText());
+	    }
+	    if (root.hasNonNull("query")) {
+		values.put("query", root.get("query").asText());
+	    }
+	    return values;
+	} catch (JsonProcessingException ignored) {
+	    return Arrays
+		.stream(body.split("&"))
+		.map(part -> part.split("=", 2))
+		.filter(parts -> parts.length == 2)
+		.collect(HashMap::new, (result, parts) -> {
+		    result.put(decodeFormValue(parts[0]), decodeFormValue(parts[1]));
+		}, HashMap::putAll);
+	}
+    }
+
+    private String decodeFormValue(String value) {
+	return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     @Get("/memories/{name}")

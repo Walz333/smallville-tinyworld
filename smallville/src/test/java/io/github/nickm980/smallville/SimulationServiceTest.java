@@ -2,8 +2,10 @@ package io.github.nickm980.smallville;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -171,5 +173,19 @@ public class SimulationServiceTest {
 	assertEquals(false, response.isSuccess());
 	assertEquals(1, response.getAgents().size());
 	assertEquals(true, response.getErrors().get(0).contains("Location does not exist"));
+    }
+
+    @Test
+    public void test_memory_stream_add_and_query_preserves_duplicate_relevant_memories() {
+	UUID uuid = service.createMemoryStream();
+	assertTrue(service.addMemory(uuid, "memory 1"));
+	assertTrue(service.addMemory(uuid, "memory 1"));
+	assertTrue(service.addMemory(uuid, "memory 1"));
+	assertTrue(service.addMemory(uuid, "memory 1"));
+
+	List<String> memories = service.getMemories(uuid, "memory 1");
+
+	assertEquals(3, memories.size());
+	assertEquals(List.of("memory 1", "memory 1", "memory 1"), memories);
     }
 }

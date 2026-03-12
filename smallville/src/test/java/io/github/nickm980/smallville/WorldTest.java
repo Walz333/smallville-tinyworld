@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import io.github.nickm980.smallville.entities.Conversation;
 import io.github.nickm980.smallville.entities.Dialog;
 import io.github.nickm980.smallville.entities.Location;
+import io.github.nickm980.smallville.entities.SimulationTime;
 import io.github.nickm980.smallville.exceptions.SmallvilleException;
 
 public class WorldTest {
@@ -65,12 +66,12 @@ public class WorldTest {
 
     @Test
     public void test_world_conversation_creation() {
-	assertEquals(0, world.getConversationsAfter(LocalDateTime.now()).size());
+	assertEquals(0, world.getConversationsAfter(SimulationTime.now()).size());
 
 	Conversation conversation = new Conversation("none", "", List.of(new Dialog("john", "hi")));
 	world.create(conversation);
 
-	assertEquals(1, world.getConversationsAfter(LocalDateTime.now().minusSeconds(1)).size());
+	assertEquals(1, world.getConversationsAfter(SimulationTime.now().minusSeconds(1)).size());
 
 	assertThrows(SmallvilleException.class, () -> {
 	    world.create(new Conversation("name", "name", List.of(new Dialog("name", "message"))));
