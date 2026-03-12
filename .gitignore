@@ -2,6 +2,7 @@ options.txt
 glove.840B.300d.txt
 .classpath
 .project
+.vscode/
 /logs/
 /.settings
 .tools/
