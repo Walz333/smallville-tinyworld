@@ -18,3 +18,4 @@ scenarios/**/logs/
 out
 pages
 node_modules
+/runs/
