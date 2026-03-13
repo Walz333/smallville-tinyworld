@@ -105,15 +105,12 @@ function Read-OrderedKeyValueDocument {
         __raw = $raw
     }
 
-    $pattern = "(?<key>" + (($OrderedKeys | ForEach-Object { [regex]::Escape($_) }) -join "|") + "):"
-    $matches = [regex]::Matches($raw, $pattern)
-    for ($i = 0; $i -lt $matches.Count; $i++) {
-        $match = $matches[$i]
-        $key = $match.Groups["key"].Value
-        $start = $match.Index + $match.Length
-        $end = if ($i + 1 -lt $matches.Count) { $matches[$i + 1].Index } else { $raw.Length }
-        $value = $raw.Substring($start, $end - $start).Trim()
-        $data[$key] = $value
+    foreach ($key in $OrderedKeys) {
+        $pattern = '(?ms)(?:^|\s)' + [regex]::Escape($key) + ':\s*(?<value>.*?)(?=(?:\s+[a-z_][a-z0-9_]*:)|$)'
+        $match = [regex]::Match($raw, $pattern)
+        if ($match.Success) {
+            $data[$key] = $match.Groups["value"].Value.Trim()
+        }
     }
 
     return [pscustomobject]$data
@@ -572,6 +569,7 @@ function Get-LatestStatePostTickEndpoint {
 function Get-BundleWarningByCode {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [object[]]$Warnings,
 
         [Parameter(Mandatory = $true)]
@@ -579,6 +577,304 @@ function Get-BundleWarningByCode {
     )
 
     return @($Warnings | Where-Object { $Codes -contains $_.code })
+}
+
+function Get-WarningCodes {
+    param(
+        [AllowEmptyCollection()]
+        [object[]]$Warnings
+    )
+
+    return @(
+        @($Warnings | ForEach-Object {
+                $code = Get-PropertyValue -Object $_ -Name "code"
+                if (-not [string]::IsNullOrWhiteSpace([string]$code)) {
+                    [string]$code
+                }
+            }) | Sort-Object -Unique
+    )
+}
+
+function Test-IsMissingValue {
+    param([AllowNull()]$Value)
+
+    if ($null -eq $Value) {
+        return $true
+    }
+
+    if ($Value -is [string]) {
+        return [string]::IsNullOrWhiteSpace($Value)
+    }
+
+    if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+        return (@($Value).Count -eq 0)
+    }
+
+    return $false
+}
+
+function Get-ComparisonStatus {
+    param(
+        [AllowNull()]$ValueA,
+        [AllowNull()]$ValueB
+    )
+
+    $missingA = Test-IsMissingValue -Value $ValueA
+    $missingB = Test-IsMissingValue -Value $ValueB
+
+    if ($missingA -and -not $missingB) {
+        return "missing-in-a"
+    }
+
+    if ($missingB -and -not $missingA) {
+        return "missing-in-b"
+    }
+
+    if ($missingA -and $missingB) {
+        return "same"
+    }
+
+    if ([object]::Equals($ValueA, $ValueB)) {
+        return "same"
+    }
+
+    return "different"
+}
+
+function New-ComparisonRow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Field,
+
+        [AllowNull()]$ValueA,
+
+        [AllowNull()]$ValueB,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+
+        [string]$Notes = ""
+    )
+
+    [pscustomobject][ordered]@{
+        field = $Field
+        status = $Status
+        value_a = $ValueA
+        value_b = $ValueB
+        notes = $Notes
+    }
+}
+
+function Get-ChecklistCategoryMap {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ChecklistView
+    )
+
+    $map = @{}
+    foreach ($category in @($ChecklistView.categories)) {
+        $map[$category.id] = $category
+    }
+
+    return $map
+}
+
+function Get-ChecklistComparisonRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ChecklistA,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ChecklistB
+    )
+
+    $mapA = Get-ChecklistCategoryMap -ChecklistView $ChecklistA
+    $mapB = Get-ChecklistCategoryMap -ChecklistView $ChecklistB
+    $orderedIds = @()
+    foreach ($category in @($ChecklistA.categories)) {
+        if ($orderedIds -notcontains $category.id) {
+            $orderedIds += $category.id
+        }
+    }
+    foreach ($category in @($ChecklistB.categories)) {
+        if ($orderedIds -notcontains $category.id) {
+            $orderedIds += $category.id
+        }
+    }
+
+    $rows = @()
+    foreach ($id in $orderedIds) {
+        $categoryA = $mapA[$id]
+        $categoryB = $mapB[$id]
+
+        if ($null -eq $categoryA) {
+            $rows += [pscustomobject][ordered]@{
+                id = $id
+                name = $categoryB.name
+                status = "missing-in-a"
+                status_a = $null
+                status_b = $categoryB.status
+                warnings_a = @()
+                warnings_b = @(Get-WarningCodes -Warnings @($categoryB.warnings))
+            }
+            continue
+        }
+
+        if ($null -eq $categoryB) {
+            $rows += [pscustomobject][ordered]@{
+                id = $id
+                name = $categoryA.name
+                status = "missing-in-b"
+                status_a = $categoryA.status
+                status_b = $null
+                warnings_a = @(Get-WarningCodes -Warnings @($categoryA.warnings))
+                warnings_b = @()
+            }
+            continue
+        }
+
+        $warningCodesA = @(Get-WarningCodes -Warnings @($categoryA.warnings))
+        $warningCodesB = @(Get-WarningCodes -Warnings @($categoryB.warnings))
+        $status = ""
+
+        if ($categoryA.status -eq "manual-review-required" -and $categoryB.status -eq "manual-review-required" -and [object]::Equals(($warningCodesA -join ","), ($warningCodesB -join ","))) {
+            $status = "manual-review-required"
+        }
+        elseif ($categoryA.status -eq $categoryB.status -and [object]::Equals(($warningCodesA -join ","), ($warningCodesB -join ","))) {
+            $status = "same"
+        }
+        elseif ($categoryA.status -eq "warning" -or $categoryB.status -eq "warning" -or -not [object]::Equals(($warningCodesA -join ","), ($warningCodesB -join ","))) {
+            $status = "warning-difference"
+        }
+        else {
+            $status = "different"
+        }
+
+        $rows += [pscustomobject][ordered]@{
+            id = $id
+            name = $categoryA.name
+            status = $status
+            status_a = $categoryA.status
+            status_b = $categoryB.status
+            warnings_a = $warningCodesA
+            warnings_b = $warningCodesB
+        }
+    }
+
+    return @($rows)
+}
+
+function Get-RunBundleCompletenessFlags {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$SummaryView
+    )
+
+    [pscustomobject][ordered]@{
+        startup_evidence_present = (
+            -not (Test-IsMissingValue -Value $SummaryView.artifact_paths.manifest) -and
+            -not (Test-IsMissingValue -Value $SummaryView.artifact_paths.endpoint_world_cold)
+        )
+        tick_evidence_present = (
+            ($SummaryView.tick_count_captured -is [int] -and $SummaryView.tick_count_captured -gt 0) -and
+            -not (Test-IsMissingValue -Value $SummaryView.artifact_paths.latest_world_tick)
+        )
+        restart_evidence_present = [bool]$SummaryView.restart_captured
+        operator_notes_present = -not (Test-IsMissingValue -Value $SummaryView.artifact_paths.operator_notes) -and (Test-Path -LiteralPath $SummaryView.artifact_paths.operator_notes)
+        proposal_review_present = -not (Test-IsMissingValue -Value $SummaryView.artifact_paths.proposal_review) -and (Test-Path -LiteralPath $SummaryView.artifact_paths.proposal_review)
+    }
+}
+
+function Get-WarningComparison {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$WarningsA,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$WarningsB
+    )
+
+    $codesA = @(Get-WarningCodes -Warnings @($WarningsA))
+    $codesB = @(Get-WarningCodes -Warnings @($WarningsB))
+    $shared = @($codesA | Where-Object { $codesB -contains $_ })
+    $aOnly = @($codesA | Where-Object { $codesB -notcontains $_ })
+    $bOnly = @($codesB | Where-Object { $codesA -notcontains $_ })
+
+    [pscustomobject][ordered]@{
+        status = if ($aOnly.Count -eq 0 -and $bOnly.Count -eq 0) { "same" } else { "warning-difference" }
+        warning_codes_a_only = $aOnly
+        warning_codes_b_only = $bOnly
+        warning_codes_shared = $shared
+    }
+}
+
+function Get-RunComparisonView {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BundlePathA,
+
+        [Parameter(Mandatory = $true)]
+        [string]$BundlePathB,
+
+        [string]$ChecklistPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..\\..")) "docs\\evals\\two-house-garden-v1-review-checklist.md")
+    )
+
+    $summaryA = Get-RunBundleSummaryView -BundlePath $BundlePathA
+    $summaryB = Get-RunBundleSummaryView -BundlePath $BundlePathB
+    $proposalA = Get-ProposalReviewView -BundlePath $BundlePathA
+    $proposalB = Get-ProposalReviewView -BundlePath $BundlePathB
+    $checklistA = Get-ChecklistStatusView -BundlePath $BundlePathA -ChecklistPath $ChecklistPath
+    $checklistB = Get-ChecklistStatusView -BundlePath $BundlePathB -ChecklistPath $ChecklistPath
+
+    $completenessA = Get-RunBundleCompletenessFlags -SummaryView $summaryA
+    $completenessB = Get-RunBundleCompletenessFlags -SummaryView $summaryB
+
+    $identityRows = @(
+        (New-ComparisonRow -Field "run_id" -ValueA $summaryA.run_id -ValueB $summaryB.run_id -Status (Get-ComparisonStatus -ValueA $summaryA.run_id -ValueB $summaryB.run_id)),
+        (New-ComparisonRow -Field "scenario_name" -ValueA $summaryA.scenario_name -ValueB $summaryB.scenario_name -Status (Get-ComparisonStatus -ValueA $summaryA.scenario_name -ValueB $summaryB.scenario_name)),
+        (New-ComparisonRow -Field "model" -ValueA $summaryA.frozen_model -ValueB $summaryB.frozen_model -Status (Get-ComparisonStatus -ValueA $summaryA.frozen_model -ValueB $summaryB.frozen_model)),
+        (New-ComparisonRow -Field "launch_mode" -ValueA $summaryA.launch_mode -ValueB $summaryB.launch_mode -Status (Get-ComparisonStatus -ValueA $summaryA.launch_mode -ValueB $summaryB.launch_mode))
+    )
+
+    $completenessRows = @(
+        (New-ComparisonRow -Field "startup_evidence_present" -ValueA $completenessA.startup_evidence_present -ValueB $completenessB.startup_evidence_present -Status (Get-ComparisonStatus -ValueA $completenessA.startup_evidence_present -ValueB $completenessB.startup_evidence_present)),
+        (New-ComparisonRow -Field "tick_evidence_present" -ValueA $completenessA.tick_evidence_present -ValueB $completenessB.tick_evidence_present -Status (Get-ComparisonStatus -ValueA $completenessA.tick_evidence_present -ValueB $completenessB.tick_evidence_present)),
+        (New-ComparisonRow -Field "restart_evidence_present" -ValueA $completenessA.restart_evidence_present -ValueB $completenessB.restart_evidence_present -Status (Get-ComparisonStatus -ValueA $completenessA.restart_evidence_present -ValueB $completenessB.restart_evidence_present)),
+        (New-ComparisonRow -Field "operator_notes_present" -ValueA $completenessA.operator_notes_present -ValueB $completenessB.operator_notes_present -Status (Get-ComparisonStatus -ValueA $completenessA.operator_notes_present -ValueB $completenessB.operator_notes_present)),
+        (New-ComparisonRow -Field "proposal_review_present" -ValueA $completenessA.proposal_review_present -ValueB $completenessB.proposal_review_present -Status (Get-ComparisonStatus -ValueA $completenessA.proposal_review_present -ValueB $completenessB.proposal_review_present))
+    )
+
+    $proposalRows = @(
+        (New-ComparisonRow -Field "proposal_count" -ValueA $proposalA.proposal_count -ValueB $proposalB.proposal_count -Status (Get-ComparisonStatus -ValueA $proposalA.proposal_count -ValueB $proposalB.proposal_count)),
+        (New-ComparisonRow -Field "approved_count" -ValueA $proposalA.approved_count -ValueB $proposalB.approved_count -Status (Get-ComparisonStatus -ValueA $proposalA.approved_count -ValueB $proposalB.approved_count)),
+        (New-ComparisonRow -Field "rejected_count" -ValueA $proposalA.rejected_count -ValueB $proposalB.rejected_count -Status (Get-ComparisonStatus -ValueA $proposalA.rejected_count -ValueB $proposalB.rejected_count)),
+        (New-ComparisonRow -Field "invalid_target_count" -ValueA $proposalA.invalid_target_count -ValueB $proposalB.invalid_target_count -Status (Get-ComparisonStatus -ValueA $proposalA.invalid_target_count -ValueB $proposalB.invalid_target_count)),
+        (New-ComparisonRow -Field "parsed_entry_count" -ValueA @($proposalA.parsed_entries).Count -ValueB @($proposalB.parsed_entries).Count -Status (Get-ComparisonStatus -ValueA @($proposalA.parsed_entries).Count -ValueB @($proposalB.parsed_entries).Count)),
+        (New-ComparisonRow -Field "latest_pending_proposal_count" -ValueA @($proposalA.latest_pending_proposals).Count -ValueB @($proposalB.latest_pending_proposals).Count -Status (Get-ComparisonStatus -ValueA @($proposalA.latest_pending_proposals).Count -ValueB @($proposalB.latest_pending_proposals).Count))
+    )
+
+    [pscustomobject][ordered]@{
+        bundle_a = [pscustomobject][ordered]@{
+            bundle_path = $summaryA.bundle_path
+            run_id = $summaryA.run_id
+            scenario_name = $summaryA.scenario_name
+        }
+        bundle_b = [pscustomobject][ordered]@{
+            bundle_path = $summaryB.bundle_path
+            run_id = $summaryB.run_id
+            scenario_name = $summaryB.scenario_name
+        }
+        comparison_sections = [pscustomobject][ordered]@{
+            bundle_identity = @($identityRows)
+            bundle_completeness = @($completenessRows)
+            proposal_review = @($proposalRows)
+            checklist_status = @(Get-ChecklistComparisonRows -ChecklistA $checklistA -ChecklistB $checklistB)
+            warning_comparison = Get-WarningComparison -WarningsA @($summaryA.warnings) -WarningsB @($summaryB.warnings)
+        }
+    }
 }
 
 function New-ChecklistCategoryStatus {
@@ -876,4 +1172,4 @@ function Get-ProposalReviewView {
     }
 }
 
-Export-ModuleMember -Function Get-RunBundleSummaryView, Get-ProposalReviewView, Get-ChecklistStatusView
+Export-ModuleMember -Function Get-RunBundleSummaryView, Get-ProposalReviewView, Get-ChecklistStatusView, Get-RunComparisonView
