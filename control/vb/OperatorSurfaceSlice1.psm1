@@ -451,6 +451,324 @@ function ConvertTo-ParsedProposalEntry {
     }
 }
 
+function ConvertTo-ChecklistCategoryId {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $normalized = ($Name.ToLowerInvariant() -replace "[^a-z0-9]+", "-").Trim("-")
+    switch ($normalized) {
+        "plan-integrity" { return "plan-integrity" }
+        "location-validity" { return "location-validity" }
+        "task-coherence" { return "task-coherence" }
+        "water-and-garden-relevance" { return "water-garden-relevance" }
+        "bounded-proposals" { return "bounded-proposals" }
+        "action-log-readability" { return "action-log-readability" }
+        "restart-reproducibility" { return "restart-reproducibility" }
+        default { return $normalized }
+    }
+}
+
+function Get-ChecklistTemplate {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ChecklistPath
+    )
+
+    if (-not (Test-Path -LiteralPath $ChecklistPath)) {
+        return $null
+    }
+
+    $lines = Get-Content -LiteralPath $ChecklistPath
+    $categories = @()
+    $current = $null
+    $inReviewItems = $false
+
+    foreach ($line in $lines) {
+        if ($line -match '^##\s+Review Items\s*$') {
+            $inReviewItems = $true
+            continue
+        }
+
+        if ($inReviewItems -and $line -match '^##\s+' -and $line -notmatch '^##\s+Review Items\s*$') {
+            break
+        }
+
+        if (-not $inReviewItems) {
+            continue
+        }
+
+        if ($line -match '^###\s+(.+)$') {
+            if ($current) {
+                $categories += [pscustomobject]$current
+            }
+
+            $name = $Matches[1].Trim()
+            $current = [ordered]@{
+                id = ConvertTo-ChecklistCategoryId -Name $name
+                name = $name
+                prompts = @()
+            }
+            continue
+        }
+
+        if ($current -and $line -match '^\s*-\s*(.+)$') {
+            $current.prompts += $Matches[1].Trim()
+        }
+    }
+
+    if ($current) {
+        $categories += [pscustomobject]$current
+    }
+
+    return [pscustomobject][ordered]@{
+        path = (Resolve-Path -LiteralPath $ChecklistPath).Path
+        categories = @($categories)
+    }
+}
+
+function Get-EndpointByPathAndTick {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$BundleData,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [AllowNull()][int]$TickIndex
+    )
+
+    $matches = @($BundleData.endpoints | Where-Object {
+            $_.path -eq $Path -and (
+                ($null -eq $TickIndex -and $null -eq $_.tick_index) -or
+                ($null -ne $TickIndex -and $null -ne $_.tick_index -and [int]$_.tick_index -eq $TickIndex)
+            )
+        })
+
+    if ($matches.Count -eq 0) {
+        return $null
+    }
+
+    return $matches[0]
+}
+
+function Get-LatestStatePostTickEndpoint {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$BundleData
+    )
+
+    $latest = $null
+    foreach ($endpoint in $BundleData.endpoints | Where-Object { $_.path -eq "/state" -and $_.method -eq "POST" -and $null -ne $_.tick_index }) {
+        if (-not $latest -or [int]$endpoint.tick_index -gt [int]$latest.tick_index) {
+            $latest = $endpoint
+        }
+    }
+
+    return $latest
+}
+
+function Get-BundleWarningByCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Warnings,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Codes
+    )
+
+    return @($Warnings | Where-Object { $Codes -contains $_.code })
+}
+
+function New-ChecklistCategoryStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Category,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Rationale,
+
+        [string[]]$EvidencePaths = @(),
+
+        [object[]]$Warnings = @()
+    )
+
+    [pscustomobject][ordered]@{
+        id = $Category.id
+        name = $Category.name
+        status = $Status
+        rationale = $Rationale
+        prompts = @($Category.prompts)
+        evidence_paths = @($EvidencePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Select-Object -Unique)
+        warnings = @($Warnings)
+    }
+}
+
+function Get-ChecklistCategoryStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Category,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$BundleData
+    )
+
+    $worldCold = Get-EndpointByPathAndTick -BundleData $BundleData -Path "/world" -TickIndex 0
+    $latestWorldTick = Get-LatestWorldTickEndpoint -BundleData $BundleData
+    $latestStatePostTick = Get-LatestStatePostTickEndpoint -BundleData $BundleData
+    $proposalReview = $BundleData.proposal_review
+    $bundleWarnings = @($BundleData.warnings)
+
+    switch ($Category.id) {
+        "plan-integrity" {
+            $evidencePaths = @(
+                $BundleData.artifacts.proposal_review
+                $latestWorldTick.__path
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $categoryWarnings = @(
+                Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_operator_notes", "inconsistent_run_id", "missing_proposal_review")
+            )
+            if (-not $latestWorldTick) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "missing" -Rationale "No latest world tick capture is available for plan review." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Plan evidence exists, but bundle warnings reduce review completeness." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Plan evidence is present and must be reviewed by a human rather than auto-scored." -EvidencePaths $evidencePaths
+        }
+        "location-validity" {
+            $evidencePaths = @(
+                $BundleData.artifacts.endpoint_world_cold
+                $latestWorldTick.__path
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $categoryWarnings = @(Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_manifest", "inconsistent_run_id"))
+            if (-not $worldCold -or -not $latestWorldTick) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "missing" -Rationale "Cold-start and latest world evidence are both required to review location validity." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Location evidence exists, but bundle consistency warnings affect confidence." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Location evidence is present and requires reviewer judgment." -EvidencePaths $evidencePaths
+        }
+        "task-coherence" {
+            $evidencePaths = @(
+                $latestWorldTick.__path
+                $latestStatePostTick.__path
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $categoryWarnings = @(Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_operator_notes", "inconsistent_run_id"))
+            if (-not $latestWorldTick) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "missing" -Rationale "A latest world tick capture is required to review task coherence." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Task evidence exists, but bundle warnings reduce review completeness." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Task evidence is present and should be judged by a reviewer, not scored automatically." -EvidencePaths $evidencePaths
+        }
+        "water-garden-relevance" {
+            $evidencePaths = @(
+                $BundleData.artifacts.endpoint_world_cold
+                $latestWorldTick.__path
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $categoryWarnings = @(Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_operator_notes", "inconsistent_run_id"))
+            if (-not $worldCold -or -not $latestWorldTick) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "missing" -Rationale "Cold-start and latest world evidence are required to review water/garden relevance." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Water/garden evidence exists, but bundle warnings reduce review completeness." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Water/garden evidence is present and requires human review against scenario intent." -EvidencePaths $evidencePaths
+        }
+        "bounded-proposals" {
+            $proposalCount = ConvertTo-NullableInt -Value (Get-PropertyValue -Object $proposalReview -Name "proposal_count")
+            $evidencePaths = @(
+                $BundleData.artifacts.proposal_review
+                $latestWorldTick.__path
+                $BundleData.artifacts.endpoint_world_proposals_cold
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $categoryWarnings = @(Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_proposal_review", "blank_proposal_count", "proposal_count_note_mismatch", "inconsistent_run_id"))
+            if (-not $proposalReview) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "missing" -Rationale "proposal_review.md is required to review proposal boundedness." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Proposal review evidence exists, but proposal-specific warnings affect trust in the record." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($proposalCount -eq 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "present" -Rationale "Proposal review evidence is present and recorded zero pending proposals for this bundle." -EvidencePaths $evidencePaths
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Proposal evidence is present and requires a human boundedness review." -EvidencePaths $evidencePaths
+        }
+        "action-log-readability" {
+            $evidencePaths = @(
+                $latestWorldTick.__path
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            $categoryWarnings = @(
+                Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_operator_notes", "inconsistent_run_id")
+            )
+            if (-not $latestWorldTick) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "missing" -Rationale "A latest world tick capture is required to review action-log readability." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Action-log evidence exists, but bundle warnings reduce review completeness." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Action-log evidence is present and must be read by a reviewer." -EvidencePaths $evidencePaths
+        }
+        "restart-reproducibility" {
+            $evidencePaths = @($BundleData.artifacts.endpoint_world_restart, $BundleData.artifacts.endpoint_state_restart, $BundleData.artifacts.log_restart, $BundleData.artifacts.operator_notes)
+            $categoryWarnings = @(
+                Get-BundleWarningByCode -Warnings $bundleWarnings -Codes @("missing_restart_evidence", "missing_operator_notes", "inconsistent_run_id")
+            )
+            if ($categoryWarnings.Count -gt 0) {
+                return New-ChecklistCategoryStatus -Category $Category -Status "warning" -Rationale "Restart review is affected by missing restart evidence or missing review notes." -EvidencePaths $evidencePaths -Warnings $categoryWarnings
+            }
+
+            return New-ChecklistCategoryStatus -Category $Category -Status "manual-review-required" -Rationale "Restart evidence is present and requires structural comparison by a reviewer." -EvidencePaths $evidencePaths
+        }
+        default {
+            return New-ChecklistCategoryStatus -Category $Category -Status "not-applicable" -Rationale "This category is not mapped in operator-surface slice 2." -EvidencePaths @()
+        }
+    }
+}
+
+function Get-ChecklistStatusView {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BundlePath,
+
+        [string]$ChecklistPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..\\..")) "docs\\evals\\two-house-garden-v1-review-checklist.md")
+    )
+
+    $bundleData = Get-RunBundleData -BundlePath $BundlePath
+    $checklist = Get-ChecklistTemplate -ChecklistPath $ChecklistPath
+    if (-not $checklist) {
+        throw "Checklist source not found at [$ChecklistPath]."
+    }
+
+    $categories = @()
+    foreach ($category in $checklist.categories) {
+        $categories += Get-ChecklistCategoryStatus -Category $category -BundleData $bundleData
+    }
+
+    return [pscustomobject][ordered]@{
+        bundle_path = $bundleData.artifacts.bundle_path
+        run_id = Get-ResolvedRunId -BundleData $bundleData
+        scenario_name = Get-PropertyValue -Object $bundleData.manifest -Name "scenario_name"
+        checklist_source_path = $checklist.path
+        categories = @($categories)
+        warnings = @($bundleData.warnings)
+    }
+}
+
 function Get-RunBundleSummaryView {
     [CmdletBinding()]
     param(
@@ -558,4 +876,4 @@ function Get-ProposalReviewView {
     }
 }
 
-Export-ModuleMember -Function Get-RunBundleSummaryView, Get-ProposalReviewView
+Export-ModuleMember -Function Get-RunBundleSummaryView, Get-ProposalReviewView, Get-ChecklistStatusView
