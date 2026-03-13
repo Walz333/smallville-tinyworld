@@ -2,8 +2,12 @@ package io.github.nickm980.smallville;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +25,7 @@ import io.github.nickm980.smallville.api.v1.dto.ImportAgentsRequest;
 import io.github.nickm980.smallville.api.v1.dto.ImportAgentsResponse;
 import io.github.nickm980.smallville.api.v1.dto.SetAgentModelRequest;
 import io.github.nickm980.smallville.entities.Agent;
+import io.github.nickm980.smallville.entities.WorldProposal;
 import io.github.nickm980.smallville.llm.ChatGPT;
 
 public class SimulationServiceTest {
@@ -187,5 +192,102 @@ public class SimulationServiceTest {
 
 	assertEquals(3, memories.size());
 	assertEquals(List.of("memory 1", "memory 1", "memory 1"), memories);
+    }
+
+    @Test
+    public void test_add_location_accepts_container_like_parents() throws Exception {
+	createLocation("Green House");
+	createLocation("Green House: Potting Room");
+	createLocation("Garden");
+
+	assertTrue(isProposalValid(newProposal("add_location", "Garden", "North Arbor", null, "To make watering rounds easier to follow.")));
+	assertTrue(isProposalValid(newProposal("add_location", "Green House", "Tray Room", null, "To separate propagation work from the main table.")));
+	assertTrue(isProposalValid(newProposal("add_location", "Green House: Potting Room", "Seed Nook", null, "To give note-making and seed sorting a quiet corner.")));
+    }
+
+    @Test
+    public void test_add_location_rejects_object_like_leaf_parents() throws Exception {
+	createLocation("Green House");
+	createLocation("Green House: Water Barrel");
+	createLocation("Green House: Glass Table");
+	createLocation("Garden");
+	createLocation("Garden: Bench");
+
+	assertFalse(isProposalValid(newProposal("add_location", "Green House: Water Barrel", "Rain Barrel Alcove", null, "To keep spare barrels together.")));
+	assertFalse(isProposalValid(newProposal("add_location", "Green House: Glass Table", "Tool Caddy Corner", null, "To keep cuttings paperwork nearby.")));
+	assertFalse(isProposalValid(newProposal("add_location", "Garden: Bench", "Pause Shelf", null, "To give tea cups a tidy resting place.")));
+    }
+
+    @Test
+    public void test_valid_pending_add_location_remains_visible_for_review() throws Exception {
+	createLocation("Garden");
+
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	assertTrue(isProposalValid(proposal));
+
+	addPendingProposal(proposal);
+
+	assertEquals(1, service.getWorldProposals().size());
+	assertEquals("add_location", service.getWorldProposals().get(0).getType());
+	assertEquals("Garden", service.getWorldProposals().get(0).getParentLocation());
+	assertEquals("North Arbor", service.getWorldProposals().get(0).getName());
+	assertEquals("To keep the watering route organized.", service.getWorldProposals().get(0).getReason());
+	assertEquals("pending", service.getWorldProposals().get(0).getStatus());
+    }
+
+    @Test
+    public void test_non_add_location_proposal_types_keep_previous_behavior() throws Exception {
+	createLocation("Green House");
+	createLocation("Green House: Glass Table");
+
+	assertTrue(isProposalValid(newProposal("add_object", "Green House: Glass Table", "Tool Basket", null, "To keep twine and labels together.")));
+	assertTrue(isProposalValid(newProposal("change_state", null, "Green House: Glass Table", "cleared", "To mark the work surface ready for propagation.")));
+    }
+
+    @Test
+    public void test_duplicate_pending_add_location_is_still_rejected() throws Exception {
+	createLocation("Garden");
+
+	WorldProposal first = newProposal("add_location", "Garden", "North Arbor", null, "To keep the watering route organized.");
+	assertTrue(isProposalValid(first));
+	addPendingProposal(first);
+
+	WorldProposal duplicate = newProposal("add_location", "Garden", "North Arbor", null, "To keep the watering route organized.");
+	assertFalse(isProposalValid(duplicate));
+    }
+
+    private void createLocation(String name) {
+	CreateLocationRequest request = new CreateLocationRequest();
+	request.setName(name);
+	service.createLocation(request);
+    }
+
+    private WorldProposal newProposal(String type, String parentLocation, String name, String proposedState, String reason) {
+	WorldProposal proposal = new WorldProposal();
+	proposal.setId(UUID.randomUUID().toString());
+	proposal.setAgent("Jamie");
+	proposal.setType(type);
+	proposal.setParentLocation(parentLocation);
+	proposal.setName(name);
+	proposal.setProposedState(proposedState);
+	proposal.setReason(reason);
+	proposal.setStatus("pending");
+	proposal.setCreatedAtTick(0);
+	return proposal;
+    }
+
+    private boolean isProposalValid(WorldProposal proposal) throws Exception {
+	Method method = SimulationService.class.getDeclaredMethod("isProposalValid", WorldProposal.class);
+	method.setAccessible(true);
+	return (boolean) method.invoke(service, proposal);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addPendingProposal(WorldProposal proposal) throws Exception {
+	Field field = SimulationService.class.getDeclaredField("proposals");
+	field.setAccessible(true);
+	List<WorldProposal> proposals = (List<WorldProposal>) field.get(service);
+	assertNotNull(proposals);
+	proposals.add(proposal);
     }
 }

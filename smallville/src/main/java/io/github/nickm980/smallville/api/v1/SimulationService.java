@@ -64,6 +64,23 @@ import io.github.nickm980.smallville.update.UpdateService;
 public class SimulationService {
 
     private static final Set<String> ALLOWED_PROPOSAL_TYPES = Set.of("add_location", "add_object", "change_state");
+    private static final Set<String> OBJECT_LIKE_ADD_LOCATION_PARENT_TOKENS = Set.of(
+	"bench",
+	"barrel",
+	"table",
+	"tray",
+	"gate",
+	"tool",
+	"tools",
+	"shelf",
+	"shelves",
+	"pot",
+	"pots",
+	"planter",
+	"planters",
+	"rack",
+	"racks"
+    );
     private static final Set<String> PENDING_PROPOSAL_STATUSES = Set.of("pending", "approved");
 
     private final Logger LOG = LoggerFactory.getLogger(SimulationService.class);
@@ -931,6 +948,9 @@ public class SimulationService {
 	    if (world.resolveLocation(proposal.getParentLocation()).isEmpty()) {
 		return false;
 	    }
+	    if ("add_location".equals(proposal.getType()) && !isValidAddLocationParent(proposal.getParentLocation())) {
+		return false;
+	    }
 	}
 
 	String targetLocation = buildProposalLocation(proposal);
@@ -948,6 +968,61 @@ public class SimulationService {
 	}
 
 	return world.getLocation(targetLocation).isEmpty();
+    }
+
+    private boolean isValidAddLocationParent(String parentLocationName) {
+	Location parent = world.resolveLocation(parentLocationName).orElse(null);
+	if (parent == null) {
+	    return false;
+	}
+
+	if (parent.getAll().size() <= 1) {
+	    return true;
+	}
+
+	if (hasDirectChildLocation(parent)) {
+	    return true;
+	}
+
+	return !isObjectLikeLeaf(parent);
+    }
+
+    private boolean hasDirectChildLocation(Location parent) {
+	String parentPath = parent.getFullPath();
+	return world
+	    .getLocations()
+	    .stream()
+	    .map(Location::getFullPath)
+	    .anyMatch(candidatePath -> isDirectChildLocation(parentPath, candidatePath));
+    }
+
+    private boolean isDirectChildLocation(String parentPath, String candidatePath) {
+	if (candidatePath == null || parentPath == null || candidatePath.equals(parentPath) || !candidatePath.startsWith(parentPath + ":")) {
+	    return false;
+	}
+
+	String remainder = candidatePath.substring(parentPath.length() + 1).trim();
+	return !remainder.isBlank() && !remainder.contains(":");
+    }
+
+    private boolean isObjectLikeLeaf(Location location) {
+	if (location == null || location.getAll().isEmpty()) {
+	    return false;
+	}
+
+	String leaf = location.getAll().get(location.getAll().size() - 1).toLowerCase(Locale.ROOT);
+	String normalizedLeaf = leaf.replaceAll("[^a-z0-9]+", " ").trim();
+	if (normalizedLeaf.isBlank()) {
+	    return false;
+	}
+
+	for (String token : normalizedLeaf.split("\\s+")) {
+	    if (OBJECT_LIKE_ADD_LOCATION_PARENT_TOKENS.contains(token)) {
+		return true;
+	    }
+	}
+
+	return false;
     }
 
     private String describeProposal(WorldProposal proposal) {
