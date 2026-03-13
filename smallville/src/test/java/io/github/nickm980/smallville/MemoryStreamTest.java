@@ -1,6 +1,7 @@
 package io.github.nickm980.smallville;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.List;
 
@@ -81,5 +82,7 @@ public class MemoryStreamTest {
 	stream.addAll(plans);
 
 	assertEquals(3, stream.getPlans().size());
+	assertFalse(stream.getPlans().stream().anyMatch(plan -> plan.getDescription().equals("9:30 AM.")));
+	assertFalse(stream.getPlans().stream().anyMatch(plan -> plan.getDescription().equals("11:00 AM.")));
     }
 }

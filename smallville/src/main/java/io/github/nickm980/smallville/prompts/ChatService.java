@@ -40,6 +40,8 @@ import io.github.nickm980.smallville.update.UpdateService;
 
 public class ChatService implements Prompts {
     private static final Pattern TIME_PATTERN = Pattern.compile("\\b\\d{1,2}:\\d{2}\\s*[APap][Mm]\\b");
+    private static final Pattern PLAN_PREFIX_PATTERN = Pattern.compile("^(?:[-*•]\\s+|\\.\\s+|\\d+[.)]\\s+)+");
+    private static final Pattern TIME_ONLY_PATTERN = Pattern.compile("^\\d{1,2}:\\d{2}\\s*[APap][Mm]\\.?$");
 
     private final LLM chat;
     private final static Logger LOG = LoggerFactory.getLogger(UpdateService.class);
@@ -227,33 +229,30 @@ public class ChatService implements Prompts {
 	}
 
 	for (String rawLine : input.replace("\r", "").split("\n")) {
-	    String line = rawLine.trim();
+	    String line = normalizePlanSegment(rawLine);
 	    if (line.isBlank()) {
 		continue;
 	    }
 
-	    Matcher matcher = TIME_PATTERN.matcher(line);
-	    List<Integer> positions = new ArrayList<Integer>();
-	    while (matcher.find()) {
-		positions.add(matcher.start());
-	    }
-
-	    if (positions.size() <= 1) {
-		segments.add(line);
+	    if (TIME_ONLY_PATTERN.matcher(line).matches()) {
 		continue;
 	    }
 
-	    for (int i = 0; i < positions.size(); i++) {
-		int start = i == 0 ? 0 : positions.get(i);
-		int end = i + 1 < positions.size() ? positions.get(i + 1) : line.length();
-		String segment = line.substring(start, end).trim().replaceAll("^[;,-]+\\s*", "");
-		if (!segment.isBlank()) {
-		    segments.add(segment);
-		}
-	    }
+	    segments.add(line);
 	}
 
 	return segments;
+    }
+
+    private String normalizePlanSegment(String rawLine) {
+	if (rawLine == null) {
+	    return "";
+	}
+
+	String normalized = rawLine.trim();
+	normalized = PLAN_PREFIX_PATTERN.matcher(normalized).replaceFirst("");
+	normalized = normalized.replaceFirst("^[;,-]+\\s*", "");
+	return normalized.trim();
     }
 
     private LocalDateTime parseTime(String line) throws DateTimeParseException {
