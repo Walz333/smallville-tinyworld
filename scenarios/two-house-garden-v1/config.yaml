@@ -1,0 +1,8 @@
+apiPath: http://localhost:11434/v1/chat/completions
+model: llama3.2:3b-16k
+timeFormat: h:mm a
+fullTimeFormat: EEEE, MMMM d, h:mm a
+yesterdayFormat: EEEE MMMM d
+reflectionCutoff: 50
+simulationFile: true
+maxRetries: 2
