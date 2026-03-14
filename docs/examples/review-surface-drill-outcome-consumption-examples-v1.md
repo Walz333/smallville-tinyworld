@@ -4,6 +4,8 @@
 
 These examples illustrate bounded read-only consumption of already-derived drill outcomes. They are illustrative only. They are not tooling behavior, validator behavior, schema examples, workflow-engine behavior, runtime behavior, routing behavior, UI design, or canonical replacement behavior.
 
+Drill outcome consumption may read, preserve, and interpret already-derived drill outcomes only and may not derive a new drill outcome family.
+
 The hard distinctions remain explicit throughout:
 
 - drill outcome = pre-decision artifact
@@ -49,7 +51,9 @@ The hard distinctions remain explicit throughout:
 - Required preservation:
   - the unresolved hard stop remains explicit
   - the hard stop remains unresolved unless human review separately resolves it
+  - When a consumed `drill-stop-outcome` is in scope, downstream consumption may continue only for the purpose of preserving halt-aware review context and may not continue on the flagged subject as though the hard stop were resolved.
   - the canonical review decision remains an approval-boundary artifact only
+  - Reference to a promoted review decision fixture as subject matter does not authorize paraphrase as substitute approval text.
   - downstream reading does not simulate review-decision replacement
 - Forbidden interpretation:
   - treating the `drill-stop-outcome` as advisory only
