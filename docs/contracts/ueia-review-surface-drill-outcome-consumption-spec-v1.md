@@ -66,15 +66,21 @@ Only these frozen drill outcome families are in scope:
 
 Consuming a drill outcome means bounded read-only downstream use of an already-derived pre-decision drill artifact.
 
+Drill outcome consumption may read, preserve, and interpret already-derived drill outcomes only and may not derive a new drill outcome family.
+
 Drill outcome consumption remains pre-decision only and may not become review decision handling, approval handling, workflow handling, execution handling, or control handling.
 
 A consumed drill outcome may preserve review-only context, drift-pause context, unresolved hard-stop context, or human-handoff context only.
 
 Consuming a `drill-stop-outcome` must preserve that the hard stop remains unresolved unless human review separately resolves it.
 
+When a consumed `drill-stop-outcome` is in scope, downstream consumption may continue only for the purpose of preserving halt-aware review context and may not continue on the flagged subject as though the hard stop were resolved.
+
 Consuming a `drill-handoff-note` may preserve human handoff only and may not become execution handoff, workflow routing, transfer state, or downstream clearance.
 
 A consumed drill outcome may reference a promoted review decision fixture as subject matter only and may not replace, extend, restate, or simulate a canonical review decision.
+
+Reference to a promoted review decision fixture as subject matter does not authorize paraphrase as substitute approval text.
 
 The hard distinctions remain explicit:
 
@@ -117,6 +123,8 @@ This specification does not authorize execution handling, execution clearance, e
 ## No-Approval-Inflation Boundary
 
 This specification does not authorize approval substitution, review-decision simulation, approval-ready wording, or any outcome-consumption language that would replace, extend, restate, or simulate a canonical review decision.
+
+No new consumption-local authority fields may be introduced in this phase.
 
 ## No-Workflow-State Boundary
 

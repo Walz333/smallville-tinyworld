@@ -8,6 +8,8 @@ This note defines how approved consumer profiles may assign bounded downstream m
 
 Consuming a drill outcome means bounded read-only downstream use of an already-derived pre-decision drill artifact.
 
+Drill outcome consumption may read, preserve, and interpret already-derived drill outcomes only and may not derive a new drill outcome family.
+
 Drill outcome consumption remains pre-decision only and may not become review decision handling, approval handling, workflow handling, execution handling, or control handling.
 
 Interpreting a consumed drill outcome means assigning bounded review meaning to a pre-decision outcome without elevating it into review decision handling, approval handling, workflow handling, execution handling, or control handling.
@@ -17,6 +19,8 @@ Stopping on consumed drill outcomes means preserving unresolved hard-stop meanin
 ## Review-Decision Boundary
 
 A consumed drill outcome may reference a promoted review decision fixture as subject matter only and may not replace, extend, restate, or simulate a canonical review decision.
+
+Reference to a promoted review decision fixture as subject matter does not authorize paraphrase as substitute approval text.
 
 The hard distinction remains explicit:
 
@@ -40,6 +44,8 @@ Interpretation of `drill-pause-note` is limited to recognizing preserved pause c
 ### `drill-stop-outcome`
 
 Consuming a `drill-stop-outcome` must preserve that the hard stop remains unresolved unless human review separately resolves it.
+
+When a consumed `drill-stop-outcome` is in scope, downstream consumption may continue only for the purpose of preserving halt-aware review context and may not continue on the flagged subject as though the hard stop were resolved.
 
 Interpretation of `drill-stop-outcome` is limited to recognizing unresolved hard-stop context and preserving the halt requirement. It may not be reinterpreted as downstream clearance, execution-ready meaning, or discretionary guidance.
 
@@ -67,6 +73,8 @@ All interpretation of consumed drill outcomes must preserve:
 - no approval inflation
 - no workflow-state inflation
 - no canonical replacement
+
+No new consumption-local authority fields may be introduced in this phase.
 
 ## Explicit Stop Conditions
 

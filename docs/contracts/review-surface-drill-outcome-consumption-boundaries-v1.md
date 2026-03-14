@@ -10,6 +10,8 @@ Outcomes remain derived only.
 
 Consumed drill outcomes remain downstream artifacts of bounded drills. They are not canonical fixtures and are not source text.
 
+Drill outcome consumption may read, preserve, and interpret already-derived drill outcomes only and may not derive a new drill outcome family.
+
 ## Pre-Decision Consumption Boundary
 
 Consumption remains pre-decision only.
@@ -36,6 +38,8 @@ Consumed outcomes may not replace, extend, restate, or simulate canonical review
 
 A consumed drill outcome may reference a promoted review decision fixture as subject matter only and may not replace, extend, restate, or simulate a canonical review decision.
 
+Reference to a promoted review decision fixture as subject matter does not authorize paraphrase as substitute approval text.
+
 The hard distinction remains explicit:
 
 - drill outcome = pre-decision artifact
@@ -47,6 +51,8 @@ The hard distinction remains explicit:
 Consumed outcomes may not soften unresolved hard stops.
 
 Consuming a `drill-stop-outcome` must preserve that the hard stop remains unresolved unless human review separately resolves it.
+
+When a consumed `drill-stop-outcome` is in scope, downstream consumption may continue only for the purpose of preserving halt-aware review context and may not continue on the flagged subject as though the hard stop were resolved.
 
 Consumed drill outcomes may not recast unresolved hard-stop context as advisory-only wording, cleared wording, routed wording, or discretionary downstream clearance.
 
@@ -85,6 +91,8 @@ No consumed drill outcome may introduce a second dossier or imply that a second 
 ## Non-Implementation Boundary
 
 This layer does not define tooling, validators, scripts, schemas, workflow engines, routing logic, runtime behavior, or UI design.
+
+No new consumption-local authority fields may be introduced in this phase.
 
 ## Explicit Stop Conditions
 
