@@ -28,7 +28,7 @@ reactions:
     {{agent.summary}}
 
     Plans: {{#agent.plans}}{{description}}; {{/agent.plans}}
-    Relevant Memories: {{#memories.relevant}}{{description}}; {{/memories.relevant}}
+    Relevant Memories: {{memories.relevant}}
 
     Decide whether {{agent.name}} should change plans because of the observation.
 

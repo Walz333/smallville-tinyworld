@@ -13,6 +13,7 @@ import io.github.nickm980.smallville.config.SmallvilleConfig;
 import io.github.nickm980.smallville.entities.Agent;
 import io.github.nickm980.smallville.entities.Location;
 import io.github.nickm980.smallville.memory.Characteristic;
+import io.github.nickm980.smallville.memory.Observation;
 import io.github.nickm980.smallville.memory.Plan;
 import io.github.nickm980.smallville.prompts.PromptRequest;
 import io.github.nickm980.smallville.prompts.PromptBuilder;
@@ -85,6 +86,32 @@ public class PromptBuilderTest {
 	assertTrue(summary.contains("Active Continuity: remember the tea tray;"));
 	assertTrue(summary.contains("Preferred Model:"));
 	assertTrue(summary.contains("Social Preference: balanced"));
+    }
+
+    @Test
+    public void test_reaction_prompt_renders_active_continuity_relevant_memories_and_observation() {
+	World localWorld = new World();
+	Location greenhouse = new Location("Green House: Glass Table");
+	localWorld.create(greenhouse);
+
+	Agent localAgent = new Agent("Jamie", List.of(new Characteristic("grounded")), "reviewing notes", greenhouse);
+	localAgent.setTraits("steady, helpful, quiet");
+	localAgent.getMemoryStream().addWorkingMemory("remember the tea tray");
+	localAgent.getMemoryStream().add(new Observation("Alex promised tea after pruning"));
+	localWorld.create(localAgent);
+
+	String prompt = new PromptBuilder()
+	    .withObservation("Alex promised tea after pruning")
+	    .withAgent(localAgent)
+	    .withWorld(localWorld)
+	    .setPrompt(SmallvilleConfig.getPrompts().getReactions().getReaction())
+	    .build()
+	    .build()
+	    .get("content");
+
+	assertTrue(prompt.contains("Active Continuity: remember the tea tray;"));
+	assertTrue(prompt.contains("Relevant Memories: Alex promised tea after pruning"));
+	assertTrue(prompt.contains("Observation: Alex promised tea after pruning"));
     }
 
     private String getKey(String s, String key) {
