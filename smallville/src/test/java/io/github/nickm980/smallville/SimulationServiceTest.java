@@ -43,16 +43,20 @@ public class SimulationServiceTest {
 
     @Test
     public void test_location_creation_is_added_to_list() {
+	int initialLocationCount = service.getAllLocations().size();
+
 	CreateLocationRequest request = new CreateLocationRequest();
 	request.setName("location");
 
 	service.createLocation(request);
 
-	assertEquals(1, service.getAllLocations().size());
+	assertEquals(initialLocationCount + 1, service.getAllLocations().size());
     }
 
     @Test
     public void test_agent_creation_is_added_to_list() {
+	int initialAgentCount = service.getAgents().size();
+
 	CreateLocationRequest request = new CreateLocationRequest();
 	request.setName("location");
 
@@ -67,7 +71,28 @@ public class SimulationServiceTest {
 
 	service.createAgent(createAgent);
 
-	assertEquals(1, service.getAgents().size());
+	assertEquals(initialAgentCount + 1, service.getAgents().size());
+    }
+
+    @Test
+    public void test_default_bootstrap_prefers_two_house_scenario_seed() {
+	assertEquals(12, service.getAllLocations().size());
+	assertEquals(2, service.getAgents().size());
+	assertTrue(world.getAgent("Jamie").isPresent());
+	assertTrue(world.getAgent("Alex").isPresent());
+	assertEquals(
+	    "Tea things laid out beside a garden notebook",
+	    world.getLocation("Blue House: Kitchen").orElseThrow().getState());
+	assertEquals(
+	    "Plan sheets and tray maps spread beside a mug ring",
+	    world.getLocation("Green House: Glass Table").orElseThrow().getState());
+	assertEquals(
+	    "Freshly prepared for transplanting and bed tidy work",
+	    world.getLocation("Garden: South Bed").orElseThrow().getState());
+	assertEquals(
+	    "A calm two-house horticultural microcosm built around watering rounds, propagation work, quiet review, and shared tea pauses.",
+	    service.getWorldSnapshot().getWorldBuilding().getSummary());
+	assertEquals("06:00-09:30", service.getWorldSnapshot().getDailyRhythm().getBreakfast());
     }
 
     @Test
@@ -98,10 +123,7 @@ public class SimulationServiceTest {
 
     @Test
     public void test_agent_creation_keeps_persona_and_working_memories_separate() {
-	CreateLocationRequest createLocation = new CreateLocationRequest();
-	createLocation.setName("Green House: Glass Table");
-
-	service.createLocation(createLocation);
+	createLocation("Green House: Glass Table");
 
 	CreateAgentRequest createAgent = new CreateAgentRequest();
 	createAgent.setActivity("sketching plants");
@@ -109,11 +131,11 @@ public class SimulationServiceTest {
 	createAgent.setMemories(List.of("Alex is observant", "Alex likes quiet studios"));
 	createAgent.setWorkingMemories(List.of("Jamie promised tea", "The Green House needs watering"));
 	createAgent.setTraits("curious, artistic, patient");
-	createAgent.setName("Alex");
+	createAgent.setName("Morgan");
 
 	service.createAgent(createAgent);
 
-	Agent alex = world.getAgent("Alex").orElseThrow();
+	Agent alex = world.getAgent("Morgan").orElseThrow();
 
 	assertEquals(2, alex.getMemoryStream().getCharacteristics().size());
 	assertEquals(2, alex.getMemoryStream().getObservations().size());
@@ -122,13 +144,8 @@ public class SimulationServiceTest {
 
     @Test
     public void test_world_snapshot_serializes_with_agents_and_locations() {
-	CreateLocationRequest root = new CreateLocationRequest();
-	root.setName("Green House");
-	service.createLocation(root);
-
-	CreateLocationRequest leaf = new CreateLocationRequest();
-	leaf.setName("Green House: Glass Table");
-	service.createLocation(leaf);
+	createLocation("Green House");
+	createLocation("Green House: Glass Table");
 
 	CreateAgentRequest createAgent = new CreateAgentRequest();
 	createAgent.setActivity("sketching plans");
@@ -136,7 +153,7 @@ public class SimulationServiceTest {
 	createAgent.setMemories(List.of("Alex likes quiet studios"));
 	createAgent.setWorkingMemories(List.of("Jamie promised tea"));
 	createAgent.setTraits("curious, artistic, patient");
-	createAgent.setName("Alex");
+	createAgent.setName("Taylor");
 	service.createAgent(createAgent);
 
 	assertDoesNotThrow(() -> {
@@ -147,24 +164,28 @@ public class SimulationServiceTest {
 
     @Test
     public void test_model_override_is_reflected_in_world_snapshot() {
-	CreateLocationRequest request = new CreateLocationRequest();
-	request.setName("Green House: Glass Table");
-	service.createLocation(request);
+	createLocation("Green House: Glass Table");
 
 	CreateAgentRequest createAgent = new CreateAgentRequest();
 	createAgent.setActivity("sketching plans");
 	createAgent.setLocation("Green House: Glass Table");
 	createAgent.setMemories(List.of("Alex likes quiet studios"));
-	createAgent.setName("Alex");
+	createAgent.setName("Taylor");
 	createAgent.setModel("gwen2.5:0.5b");
 	createAgent.setTraits("curious, artistic, patient");
 	service.createAgent(createAgent);
 
 	SetAgentModelRequest override = new SetAgentModelRequest();
 	override.setModel("llama3.2:3b");
-	service.setAgentModel("Alex", override);
+	service.setAgentModel("Taylor", override);
 
-	assertEquals("llama3.2:3b", service.getWorldSnapshot().getAgents().get(0).getModel());
+	assertEquals(
+	    "llama3.2:3b",
+	    service.getWorldSnapshot().getAgents().stream()
+		.filter(agent -> agent.getName().equals("Taylor"))
+		.findFirst()
+		.orElseThrow()
+		.getModel());
     }
 
     @Test
@@ -257,6 +278,10 @@ public class SimulationServiceTest {
     }
 
     private void createLocation(String name) {
+	if (world.getLocation(name).isPresent()) {
+	    return;
+	}
+
 	CreateLocationRequest request = new CreateLocationRequest();
 	request.setName(name);
 	service.createLocation(request);
