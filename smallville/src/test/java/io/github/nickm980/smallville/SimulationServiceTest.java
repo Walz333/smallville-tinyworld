@@ -300,6 +300,35 @@ public class SimulationServiceTest {
     }
 
     @Test
+    public void test_conversation_update_isolated_dialogue_captures_single_line_for_agent_only() throws Exception {
+	World localWorld = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	localWorld.create(kitchen);
+
+	Agent jamie = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "bringing tea",
+	    kitchen);
+	localWorld.create(jamie);
+
+	Prompts prompts = Mockito.mock(Prompts.class);
+	Mockito.when(prompts.saySomething(jamie, "The greenhouse feels quiet today."))
+	    .thenReturn(new Dialog("Jamie", "I should check the tea tray before moving on."));
+
+	Method method = UpdateConversation.class.getDeclaredMethod("updateConversation", Agent.class, Prompts.class, World.class, String.class);
+	method.setAccessible(true);
+	boolean result = (boolean) method.invoke(new UpdateConversation(), jamie, prompts, localWorld, "The greenhouse feels quiet today.");
+
+	assertTrue(result);
+	assertEquals(1, jamie.getMemoryStream().getObservations().size());
+	assertEquals(1, jamie.getMemoryStream().getWorkingMemories().size());
+	assertEquals("I should check the tea tray before moving on.", jamie.getMemoryStream().getObservations().get(0).getDescription());
+	assertEquals("I should check the tea tray before moving on.", jamie.getMemoryStream().getWorkingMemories().get(0).getDescription());
+	assertEquals(0, localWorld.getConversationsAfter(null).size());
+    }
+
+    @Test
     public void test_model_override_is_reflected_in_world_snapshot() {
 	createLocation("Green House: Glass Table");
 

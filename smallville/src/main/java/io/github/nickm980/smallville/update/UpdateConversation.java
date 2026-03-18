@@ -35,6 +35,9 @@ public class UpdateConversation extends AgentUpdate {
 	if (subject == null) {
 	    LOG.warn("[Conversation] Conversation detected but no subject found. Attempting isolated dialogue");
 	    Dialog dialog =  converter.saySomething(agent, observation);
+	    Observation isolatedDialog = new Observation(dialog.getMessage());
+	    agent.getMemoryStream().add(isolatedDialog);
+	    agent.getMemoryStream().addWorkingMemory(isolatedDialog);
 	    LOG.info(agent.getFullName() + " said " + dialog.getMessage());
 	    return true;
 	}
