@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,8 +47,16 @@ public class SmallvilleConfig {
     }
 
     private static InputStream loadInputStream(String path) {
-	Path[] candidates = new Path[] { Paths.get(path), Paths.get("src", "main", "resources", path),
-		Paths.get("smallville", "src", "main", "resources", path) };
+	List<Path> candidates = new ArrayList<Path>();
+	candidates.add(Paths.get(path));
+
+	if (isDefaultScenarioPath(path)) {
+	    candidates.add(Paths.get("scenarios", "two-house-garden-v1", path));
+	    candidates.add(Paths.get("..", "scenarios", "two-house-garden-v1", path));
+	}
+
+	candidates.add(Paths.get("src", "main", "resources", path));
+	candidates.add(Paths.get("smallville", "src", "main", "resources", path));
 
 	InputStream inputStream = null;
 
@@ -75,6 +85,10 @@ public class SmallvilleConfig {
 
 	return inputStream;
     }
+
+	private static boolean isDefaultScenarioPath(String path) {
+	    return "config.yaml".equals(path) || "simulation.yaml".equals(path);
+	}
 
     private static JsonNode loadJsonFile(String file) {
 	ObjectMapper mapper = new ObjectMapper();
