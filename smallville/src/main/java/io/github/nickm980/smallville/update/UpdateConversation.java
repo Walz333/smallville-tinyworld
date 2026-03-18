@@ -50,6 +50,10 @@ public class UpdateConversation extends AgentUpdate {
 	}
 
 	Conversation conversation = converter.getConversationIfExists(agent, other, observation);
+	if (conversation == null || conversation.size() == 0) {
+	    LOG.warn("[Conversation] No dialog lines were produced for {} and {}. Skipping conversation record.", agent.getFullName(), other.getFullName());
+	    return false;
+	}
 
 	List<Observation> memories = conversation
 	    .getDialog()

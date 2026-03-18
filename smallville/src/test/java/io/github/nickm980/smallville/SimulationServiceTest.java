@@ -329,6 +329,41 @@ public class SimulationServiceTest {
     }
 
     @Test
+    public void test_conversation_update_empty_named_conversation_is_a_no_op() throws Exception {
+	World localWorld = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	localWorld.create(kitchen);
+
+	Agent jamie = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "bringing tea",
+	    kitchen);
+	Agent alex = new Agent(
+	    "Alex",
+	    List.of(new Characteristic("curious"), new Characteristic("artistic")),
+	    "checking seedlings",
+	    kitchen);
+	localWorld.create(jamie);
+	localWorld.create(alex);
+
+	Prompts prompts = Mockito.mock(Prompts.class);
+	Mockito.when(prompts.getConversationIfExists(jamie, alex, "Alex, can we review the seedlings?"))
+	    .thenReturn(new Conversation("Jamie", "Alex", List.of()));
+
+	Method method = UpdateConversation.class.getDeclaredMethod("updateConversation", Agent.class, Prompts.class, World.class, String.class);
+	method.setAccessible(true);
+	boolean result = (boolean) method.invoke(new UpdateConversation(), jamie, prompts, localWorld, "Alex, can we review the seedlings?");
+
+	assertFalse(result);
+	assertEquals(0, jamie.getMemoryStream().getObservations().size());
+	assertEquals(0, alex.getMemoryStream().getObservations().size());
+	assertEquals(0, jamie.getMemoryStream().getWorkingMemories().size());
+	assertEquals(0, alex.getMemoryStream().getWorkingMemories().size());
+	assertEquals(0, localWorld.getConversationsAfter(null).size());
+    }
+
+    @Test
     public void test_model_override_is_reflected_in_world_snapshot() {
 	createLocation("Green House: Glass Table");
 
