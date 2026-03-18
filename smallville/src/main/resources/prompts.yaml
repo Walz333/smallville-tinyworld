@@ -106,7 +106,7 @@ plans:
     {{world.description}}
     {{agent.summary}}
     Daily Rhythm: breakfast {{dailyRhythm.breakfast}}, lunch {{dailyRhythm.lunch}}, dinner {{dailyRhythm.dinner}}, morning tea {{dailyRhythm.morningTea}}, afternoon tea {{dailyRhythm.afternoonTea}}, snack {{dailyRhythm.snack}}
-    Relevant Memories: {{#memories.relevant}}{{description}}; {{/memories.relevant}}
+    Relevant Memories: {{memories.relevant}}
     Observation ({{date.time}}): {{observation}}
 
     * Only use the available locations

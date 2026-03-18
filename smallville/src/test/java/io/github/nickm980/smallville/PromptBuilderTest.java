@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.github.nickm980.smallville.config.SmallvilleConfig;
+import io.github.nickm980.smallville.config.simulation.SimulationFile;
 import io.github.nickm980.smallville.entities.Agent;
 import io.github.nickm980.smallville.entities.Location;
 import io.github.nickm980.smallville.memory.Characteristic;
@@ -112,6 +113,43 @@ public class PromptBuilderTest {
 	assertTrue(prompt.contains("Active Continuity: remember the tea tray;"));
 	assertTrue(prompt.contains("Relevant Memories: Alex promised tea after pruning"));
 	assertTrue(prompt.contains("Observation: Alex promised tea after pruning"));
+    }
+
+    @Test
+    public void test_long_term_prompt_renders_active_continuity_relevant_memories_schedule_context_and_observation() {
+	World localWorld = new World();
+	Location greenhouse = new Location("Green House: Glass Table");
+	localWorld.create(greenhouse);
+
+	Agent localAgent = new Agent("Jamie", List.of(new Characteristic("grounded")), "reviewing notes", greenhouse);
+	localAgent.setTraits("steady, helpful, quiet");
+	localAgent.getMemoryStream().addWorkingMemory("remember the tea tray");
+	localAgent.getMemoryStream().add(new Observation("Alex promised tea after pruning"));
+	localWorld.create(localAgent);
+
+	SimulationFile.DailyRhythmSeed rhythm = new SimulationFile.DailyRhythmSeed();
+	rhythm.setBreakfast("06:00-09:30");
+	rhythm.setLunch("12:00-14:00");
+	rhythm.setDinner("18:00-20:30");
+	rhythm.setMorningTea("06:00-10:00");
+	rhythm.setAfternoonTea("15:00-17:30");
+	rhythm.setSnack("Flexible morning or afternoon");
+
+	String prompt = new PromptBuilder()
+	    .withObservation("Alex promised tea after pruning")
+	    .withDailyRhythm(rhythm)
+	    .withAgent(localAgent)
+	    .withWorld(localWorld)
+	    .setPrompt(SmallvilleConfig.getPrompts().getPlans().getLongTerm())
+	    .build()
+	    .build()
+	    .get("content");
+
+	assertTrue(prompt.contains("Active Continuity: remember the tea tray;"));
+	assertTrue(prompt.contains("Relevant Memories: Alex promised tea after pruning"));
+	assertTrue(prompt.contains("Daily Rhythm: breakfast 06:00-09:30, lunch 12:00-14:00, dinner 18:00-20:30"));
+	assertTrue(prompt.contains("Observation ("));
+	assertTrue(prompt.contains("Alex promised tea after pruning"));
     }
 
     private String getKey(String s, String key) {
