@@ -53,5 +53,9 @@ public class UpdateServiceTest {
 	assertEquals(1, world.getConversationsAfter(null).size());
 	assertEquals(4, alex.getMemoryStream().getObservations().size());
 	assertEquals(4, jamie.getMemoryStream().getObservations().size());
+	assertEquals(1, alex.getMemoryStream().getWorkingMemories().size());
+	assertEquals(1, jamie.getMemoryStream().getWorkingMemories().size());
+	assertEquals("That sounds like a calm plan.", alex.getMemoryStream().getWorkingMemories().get(0).getDescription());
+	assertEquals("That sounds like a calm plan.", jamie.getMemoryStream().getWorkingMemories().get(0).getDescription());
     }
 }

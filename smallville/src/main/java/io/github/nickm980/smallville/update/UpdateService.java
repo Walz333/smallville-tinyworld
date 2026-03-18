@@ -123,6 +123,11 @@ public class UpdateService {
 
 	agent.getMemoryStream().addAll(memories);
 	other.getMemoryStream().addAll(memories);
+	if (!memories.isEmpty()) {
+	    Observation latestDialog = memories.get(memories.size() - 1);
+	    agent.getMemoryStream().addWorkingMemory(latestDialog);
+	    other.getMemoryStream().addWorkingMemory(latestDialog);
+	}
 	world.create(conversation);
 	return true;
     }
