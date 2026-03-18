@@ -26,12 +26,15 @@ import io.github.nickm980.smallville.api.v1.dto.ImportAgentsResponse;
 import io.github.nickm980.smallville.api.v1.dto.SetAgentModelRequest;
 import io.github.nickm980.smallville.api.v1.dto.WorldSnapshotResponse;
 import io.github.nickm980.smallville.entities.Agent;
+import io.github.nickm980.smallville.entities.Conversation;
+import io.github.nickm980.smallville.entities.Dialog;
 import io.github.nickm980.smallville.entities.Location;
 import io.github.nickm980.smallville.entities.WorldProposal;
 import io.github.nickm980.smallville.llm.ChatGPT;
 import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.prompts.Prompts;
 import io.github.nickm980.smallville.prompts.dto.CurrentActivity;
+import io.github.nickm980.smallville.update.UpdateConversation;
 import io.github.nickm980.smallville.update.UpdateCurrentActivity;
 import io.github.nickm980.smallville.update.UpdateInfo;
 
@@ -248,6 +251,52 @@ public class SimulationServiceTest {
 	assertTrue(agent.getMemoryStream().getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("checked the propagation notes")));
 	assertTrue(agent.getMemoryStream().getObservations().stream().anyMatch(memory -> memory.getDescription().equals("brewed tea")));
 	assertTrue(agent.getMemoryStream().getObservations().stream().anyMatch(memory -> memory.getDescription().equals("checked the propagation notes")));
+    }
+
+    @Test
+    public void test_conversation_update_adds_latest_dialog_to_working_memory_without_spam() throws Exception {
+	World localWorld = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	localWorld.create(kitchen);
+
+	Agent jamie = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "bringing tea",
+	    kitchen);
+	Agent alex = new Agent(
+	    "Alex",
+	    List.of(new Characteristic("curious"), new Characteristic("artistic")),
+	    "checking seedlings",
+	    kitchen);
+	localWorld.create(jamie);
+	localWorld.create(alex);
+
+	Prompts prompts = Mockito.mock(Prompts.class);
+	Conversation conversation = new Conversation(
+	    "Jamie",
+	    "Alex",
+	    List.of(
+		new Dialog("Jamie", "The seedlings look stronger this morning."),
+		new Dialog("Alex", "Good, I brought the tray notes with me."),
+		new Dialog("Jamie", "Let us compare the watering order before lunch."),
+		new Dialog("Alex", "Start with the glass-table notes.")));
+	Mockito.when(prompts.getConversationIfExists(jamie, alex, "Alex, can we review the seedlings?"))
+	    .thenReturn(conversation);
+
+	Method method = UpdateConversation.class.getDeclaredMethod("updateConversation", Agent.class, Prompts.class, World.class, String.class);
+	method.setAccessible(true);
+	boolean result = (boolean) method.invoke(new UpdateConversation(), jamie, prompts, localWorld, "Alex, can we review the seedlings?");
+
+	assertFalse(result);
+	assertEquals(4, jamie.getMemoryStream().getObservations().size());
+	assertEquals(4, alex.getMemoryStream().getObservations().size());
+	assertEquals(1, jamie.getMemoryStream().getWorkingMemories().size());
+	assertEquals(1, alex.getMemoryStream().getWorkingMemories().size());
+	assertEquals("Start with the glasstable notes.", jamie.getMemoryStream().getWorkingMemories().get(0).getDescription());
+	assertEquals("Start with the glasstable notes.", alex.getMemoryStream().getWorkingMemories().get(0).getDescription());
+	assertFalse(jamie.getMemoryStream().getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("The seedlings look stronger this morning.")));
+	assertEquals(1, localWorld.getConversationsAfter(null).size());
     }
 
     @Test
