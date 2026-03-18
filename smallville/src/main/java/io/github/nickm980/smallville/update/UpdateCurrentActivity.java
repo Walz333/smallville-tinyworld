@@ -44,6 +44,7 @@ public class UpdateCurrentActivity extends AgentUpdate {
 	String lastActivity = activity.getLastActivity();
 	if (lastActivity != null && !lastActivity.isBlank()) {
 	    agent.getMemoryStream().add(new Observation(lastActivity));
+	    agent.getMemoryStream().addWorkingMemory(lastActivity);
 	}
 
 	return next(service, world, agent, info);

@@ -26,8 +26,14 @@ import io.github.nickm980.smallville.api.v1.dto.ImportAgentsResponse;
 import io.github.nickm980.smallville.api.v1.dto.SetAgentModelRequest;
 import io.github.nickm980.smallville.api.v1.dto.WorldSnapshotResponse;
 import io.github.nickm980.smallville.entities.Agent;
+import io.github.nickm980.smallville.entities.Location;
 import io.github.nickm980.smallville.entities.WorldProposal;
 import io.github.nickm980.smallville.llm.ChatGPT;
+import io.github.nickm980.smallville.memory.Characteristic;
+import io.github.nickm980.smallville.prompts.Prompts;
+import io.github.nickm980.smallville.prompts.dto.CurrentActivity;
+import io.github.nickm980.smallville.update.UpdateCurrentActivity;
+import io.github.nickm980.smallville.update.UpdateInfo;
 
 public class SimulationServiceTest {
 
@@ -193,6 +199,55 @@ public class SimulationServiceTest {
 	assertFalse(snapshotAgent.getWorkingMemories().equals(snapshotAgent.getRecentMemories()));
 	assertTrue(snapshotAgent.getRecentMemories().contains("watered the propagation tray"));
 	assertFalse(snapshotAgent.getRecentMemories().contains("Jamie promised tea"));
+    }
+
+    @Test
+    public void test_current_activity_update_refreshes_working_memory_without_collapsing_into_observations() {
+	World localWorld = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	Location glassTable = new Location("Green House: Glass Table");
+	localWorld.create(kitchen);
+	localWorld.create(glassTable);
+
+	Agent agent = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "brewing tea",
+	    kitchen);
+
+	Prompts prompts = Mockito.mock(Prompts.class);
+	UpdateCurrentActivity update = new UpdateCurrentActivity();
+
+	CurrentActivity first = new CurrentActivity();
+	first.setActivity("bringing tea to Alex");
+	first.setLocation("Green House: Glass Table");
+	first.setEmoji("tea");
+	first.setLastActivity("brewed tea");
+
+	CurrentActivity duplicate = new CurrentActivity();
+	duplicate.setActivity("bringing tea to Alex");
+	duplicate.setLocation("Green House: Glass Table");
+	duplicate.setEmoji("tea");
+	duplicate.setLastActivity("brewed tea");
+
+	CurrentActivity second = new CurrentActivity();
+	second.setActivity("checking seed notes");
+	second.setLocation("Green House: Glass Table");
+	second.setEmoji("notes");
+	second.setLastActivity("checked the propagation notes");
+
+	Mockito.when(prompts.getCurrentActivity(agent)).thenReturn(first, duplicate, second);
+
+	update.update(prompts, localWorld, agent, new UpdateInfo());
+	update.update(prompts, localWorld, agent, new UpdateInfo());
+	update.update(prompts, localWorld, agent, new UpdateInfo());
+
+	assertEquals(3, agent.getMemoryStream().getObservations().size());
+	assertEquals(2, agent.getMemoryStream().getWorkingMemories().size());
+	assertEquals(1, agent.getMemoryStream().getWorkingMemories().stream().filter(memory -> memory.getDescription().equals("brewed tea")).count());
+	assertTrue(agent.getMemoryStream().getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("checked the propagation notes")));
+	assertTrue(agent.getMemoryStream().getObservations().stream().anyMatch(memory -> memory.getDescription().equals("brewed tea")));
+	assertTrue(agent.getMemoryStream().getObservations().stream().anyMatch(memory -> memory.getDescription().equals("checked the propagation notes")));
     }
 
     @Test

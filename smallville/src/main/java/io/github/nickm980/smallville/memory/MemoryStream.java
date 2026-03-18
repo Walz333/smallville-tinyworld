@@ -11,6 +11,8 @@ import java.util.stream.Stream;
  * Includes plans, observations, and characteristics
  */
 public class MemoryStream {
+    private static final int MAX_WORKING_MEMORIES = 3;
+
     private List<Memory> memories;
     private List<Observation> workingMemories;
 
@@ -98,19 +100,33 @@ public class MemoryStream {
     }
 
     public void addWorkingMemory(String description) {
-    if (description == null || description.isBlank()) {
-        return;
-    }
-
-    workingMemories.add(new Observation(description));
+    addWorkingMemory(new Observation(description));
     }
 
     public void addWorkingMemory(Observation memory) {
-    if (memory == null) {
+    if (memory == null || memory.getDescription() == null || memory.getDescription().isBlank()) {
         return;
     }
 
+    String description = memory.getDescription().trim();
+    workingMemories.removeIf(existing -> existing.getDescription().equalsIgnoreCase(description));
     workingMemories.add(memory);
+    trimWorkingMemories();
+    }
+
+    private void trimWorkingMemories() {
+    while (workingMemories.size() > MAX_WORKING_MEMORIES) {
+        Observation oldest = workingMemories
+        .stream()
+        .min(Comparator.comparing(Observation::getTime))
+        .orElse(null);
+
+        if (oldest == null) {
+        break;
+        }
+
+        workingMemories.remove(oldest);
+    }
     }
 
     public void add(Memory memory) {

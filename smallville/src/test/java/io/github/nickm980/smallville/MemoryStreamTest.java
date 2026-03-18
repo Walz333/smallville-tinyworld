@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,25 @@ public class MemoryStreamTest {
 	assertTrue(stream.getRelevantMemories("tea tray", -1).stream()
 	    .map(Memory::getDescription)
 	    .anyMatch("remember the tea tray"::equals));
+    }
+
+    @Test
+    public void test_working_memories_are_deduplicated_and_trimmed() {
+	MemoryStream stream = new MemoryStream();
+	LocalDateTime now = LocalDateTime.now();
+
+	stream.addWorkingMemory(new Observation("tea tray", now.minusMinutes(4), 0));
+	stream.addWorkingMemory(new Observation("seed notes", now.minusMinutes(3), 0));
+	stream.addWorkingMemory(new Observation("watering round", now.minusMinutes(2), 0));
+	stream.addWorkingMemory(new Observation("tea tray", now.minusMinutes(1), 0));
+	stream.addWorkingMemory(new Observation("potting bench", now, 0));
+
+	assertEquals(3, stream.getWorkingMemories().size());
+	assertEquals(1, stream.getWorkingMemories().stream().filter(memory -> memory.getDescription().equals("tea tray")).count());
+	assertTrue(stream.getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("tea tray")));
+	assertTrue(stream.getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("watering round")));
+	assertTrue(stream.getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("potting bench")));
+	assertFalse(stream.getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("seed notes")));
     }
 
     @Test
