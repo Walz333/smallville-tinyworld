@@ -2,6 +2,7 @@ package io.github.nickm980.smallville;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
@@ -22,6 +23,20 @@ public class MemoryStreamTest {
 	stream.add(new Observation("memory"));
 
 	assertEquals(1, stream.getObservations().size());
+    }
+
+    @Test
+    public void test_working_memories_are_distinct_from_observations_but_still_queryable() {
+	MemoryStream stream = new MemoryStream();
+	stream.addWorkingMemory("remember the tea tray");
+	stream.add(new Observation("watered the south bed"));
+
+	assertEquals(1, stream.getWorkingMemories().size());
+	assertEquals(1, stream.getObservations().size());
+	assertEquals("remember the tea tray", stream.getWorkingMemories().get(0).getDescription());
+	assertTrue(stream.getRelevantMemories("tea tray", -1).stream()
+	    .map(Memory::getDescription)
+	    .anyMatch("remember the tea tray"::equals));
     }
 
     @Test
@@ -72,11 +87,9 @@ public class MemoryStreamTest {
     @Test
     public void test_adding_and_getting_plans_from_memory_stream() {
 	ChatService service = new ChatService(new World(), new ChatGPT());
-	List<Plan> plans = service.parsePlans("""
-		\nI will then go to the Green House and sleep from 12:05 AM.
-		\nI will wake up and make breakfast from 11:30 PM - 9:30 AM.
-		\nI will then go to the Forest and spend some time gathering branches from 10:00 AM - 11:00 AM.
-				""");
+	List<Plan> plans = service.parsePlans("\nI will then go to the Green House and sleep from 12:05 AM."
+	    + "\nI will wake up and make breakfast from 11:30 PM - 9:30 AM."
+	    + "\nI will then go to the Forest and spend some time gathering branches from 10:00 AM - 11:00 AM.");
 	MemoryStream stream = new MemoryStream();
 
 	stream.addAll(plans);

@@ -287,7 +287,7 @@ public class SimulationService {
 
 	for (String memory : workingMemories) {
 	    if (memory != null && !memory.isBlank()) {
-		agent.getMemoryStream().add(new Observation(memory));
+		agent.getMemoryStream().addWorkingMemory(memory);
 	    }
 	}
     }
@@ -653,7 +653,7 @@ public class SimulationService {
 	result.setGoals(new ArrayList<String>(agent.getGoals()));
 	result.setRituals(new ArrayList<String>(agent.getRituals()));
 	result.setPersona(agent.getMemoryStream().getCharacteristics().stream().map(Memory::getDescription).collect(Collectors.toList()));
-	result.setWorkingMemories(agent.getMemoryStream().getObservations().stream().sorted(Comparator.comparing(Observation::getTime).reversed()).limit(6).map(Memory::getDescription).collect(Collectors.toList()));
+	result.setWorkingMemories(agent.getMemoryStream().getWorkingMemories().stream().sorted(Comparator.comparing(Observation::getTime).reversed()).limit(6).map(Memory::getDescription).collect(Collectors.toList()));
 	result.setRecentMemories(agent.getMemoryStream().getObservations().stream().sorted(Comparator.comparing(Observation::getTime).reversed()).limit(6).map(Memory::getDescription).collect(Collectors.toList()));
 	result.setShortPlans(agent.getMemoryStream().getPlans().stream().filter(plan -> plan.getType() == PlanType.SHORT_TERM).map(Plan::getDescription).collect(Collectors.toList()));
 	result.setLongPlans(agent.getMemoryStream().getPlans().stream().filter(plan -> plan.getType() == PlanType.LONG_TERM).map(Plan::getDescription).collect(Collectors.toList()));

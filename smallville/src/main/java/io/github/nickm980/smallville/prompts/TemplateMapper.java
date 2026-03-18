@@ -30,6 +30,7 @@ public class TemplateMapper {
 	data.put("agent.name", agent.getFullName());
 	data.put("agent.locationName", agent.getLocation() == null ? "Unknown" : agent.getLocation().getFullPath());
 	data.put("agent.description", stream.getCharacteristics().stream().map(c -> c.getDescription()).collect(Collectors.toList()));
+	data.put("agent.workingMemories", stream.getWorkingMemories());
 	data.put("agent.traits", agent.getTraits());
 	data.put("agent.goals", agent.getGoals());
 	data.put("agent.rituals", agent.getRituals());
@@ -51,6 +52,7 @@ public class TemplateMapper {
 
 	result.put("name", agent.getFullName());
 	result.put("memories", agent.getMemoryStream().getMemories().stream().limit(10).collect(Collectors.toList()));
+	result.put("workingMemories", stream.getWorkingMemories());
 	result.put("activity", agent.getCurrentActivity());
 	result.put("lastActivity", agent.getLastActivity());
 	result.put("summary", buildAgentSummary(agent));

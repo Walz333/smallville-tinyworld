@@ -24,6 +24,7 @@ import io.github.nickm980.smallville.api.v1.dto.CreateMemoryRequest;
 import io.github.nickm980.smallville.api.v1.dto.ImportAgentsRequest;
 import io.github.nickm980.smallville.api.v1.dto.ImportAgentsResponse;
 import io.github.nickm980.smallville.api.v1.dto.SetAgentModelRequest;
+import io.github.nickm980.smallville.api.v1.dto.WorldSnapshotResponse;
 import io.github.nickm980.smallville.entities.Agent;
 import io.github.nickm980.smallville.entities.WorldProposal;
 import io.github.nickm980.smallville.llm.ChatGPT;
@@ -138,7 +139,8 @@ public class SimulationServiceTest {
 	Agent alex = world.getAgent("Morgan").orElseThrow();
 
 	assertEquals(2, alex.getMemoryStream().getCharacteristics().size());
-	assertEquals(2, alex.getMemoryStream().getObservations().size());
+	assertEquals(2, alex.getMemoryStream().getWorkingMemories().size());
+	assertEquals(0, alex.getMemoryStream().getObservations().size());
 	assertEquals("curious, artistic, patient", alex.getTraits());
     }
 
@@ -160,6 +162,37 @@ public class SimulationServiceTest {
 	    new ObjectMapper().writeValueAsString(service.getWorldSnapshot());
 	});
 	assertEquals("06:00-09:30", service.getWorldSnapshot().getDailyRhythm().getBreakfast());
+    }
+
+    @Test
+    public void test_world_snapshot_exposes_distinct_working_and_recent_memories() {
+	createLocation("Green House: Glass Table");
+
+	CreateAgentRequest createAgent = new CreateAgentRequest();
+	createAgent.setActivity("sketching plans");
+	createAgent.setLocation("Green House: Glass Table");
+	createAgent.setMemories(List.of("Alex likes quiet studios"));
+	createAgent.setWorkingMemories(List.of("Jamie promised tea"));
+	createAgent.setTraits("curious, artistic, patient");
+	createAgent.setName("Taylor");
+	service.createAgent(createAgent);
+
+	CreateMemoryRequest request = new CreateMemoryRequest();
+	request.setName("Taylor");
+	request.setDescription("watered the propagation tray");
+	request.setReactable(false);
+	service.createMemory(request);
+
+	WorldSnapshotResponse.WorldAgentResponse snapshotAgent = service.getWorldSnapshot().getAgents().stream()
+	    .filter(agent -> agent.getName().equals("Taylor"))
+	    .findFirst()
+	    .orElseThrow();
+
+	assertEquals(List.of("Jamie promised tea"), snapshotAgent.getWorkingMemories());
+	assertEquals(List.of("watered the propagation tray"), snapshotAgent.getRecentMemories());
+	assertFalse(snapshotAgent.getWorkingMemories().equals(snapshotAgent.getRecentMemories()));
+	assertTrue(snapshotAgent.getRecentMemories().contains("watered the propagation tray"));
+	assertFalse(snapshotAgent.getRecentMemories().contains("Jamie promised tea"));
     }
 
     @Test

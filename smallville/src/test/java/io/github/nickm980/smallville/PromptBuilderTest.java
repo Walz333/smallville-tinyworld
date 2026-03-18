@@ -16,6 +16,7 @@ import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.memory.Plan;
 import io.github.nickm980.smallville.prompts.PromptRequest;
 import io.github.nickm980.smallville.prompts.PromptBuilder;
+import io.github.nickm980.smallville.prompts.TemplateMapper;
 
 public class PromptBuilderTest {
     static PromptBuilder builder;
@@ -70,6 +71,20 @@ public class PromptBuilderTest {
 	assertEquals("Doing nothing", getKey(result, "agent.lastActivity"));
 	assertTrue(getKey(result, "agent.memories").contains("desc"));
 	assertEquals("name", getKey(result, "agent.name"));
+    }
+
+    @Test
+    public void test_agent_summary_includes_working_memory_and_existing_fields() {
+	agent.setTraits("steady, helpful, quiet");
+	agent.getMemoryStream().addWorkingMemory("remember the tea tray");
+
+	String summary = new TemplateMapper().buildAgentSummary(agent);
+
+	assertTrue(summary.contains("Name: name"));
+	assertTrue(summary.contains("Current Location: location"));
+	assertTrue(summary.contains("Active Continuity: remember the tea tray;"));
+	assertTrue(summary.contains("Preferred Model:"));
+	assertTrue(summary.contains("Social Preference: balanced"));
     }
 
     private String getKey(String s, String key) {

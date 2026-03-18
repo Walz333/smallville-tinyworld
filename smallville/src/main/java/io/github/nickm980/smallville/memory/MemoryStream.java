@@ -1,11 +1,8 @@
 package io.github.nickm980.smallville.memory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
@@ -15,9 +12,11 @@ import java.util.stream.Stream;
  */
 public class MemoryStream {
     private List<Memory> memories;
+    private List<Observation> workingMemories;
 
     public MemoryStream() {
 	this.memories = new ArrayList<Memory>();
+	this.workingMemories = new ArrayList<Observation>();
     }
 
     public void prunePlans(PlanType type) {
@@ -41,7 +40,7 @@ public class MemoryStream {
      * @return
      */
     public List<Memory> getRelevantMemories(String query, int minImportance) {
-	return memories
+    return getMemories()
 	    .stream()
 	    .filter(memory -> memory.getImportance() >= minImportance)
 	    .sorted(Comparator.comparingDouble((Memory memory) -> memory.getScore(query)).reversed())
@@ -50,7 +49,7 @@ public class MemoryStream {
     }
 
     public List<Memory> getUnweightedMemories() {
-	return memories.stream().filter(memory -> {
+    return getMemories().stream().filter(memory -> {
 	    return memory.getImportance() == 0 && !(memory instanceof Plan);
 	}).collect(Collectors.toList());
     }
@@ -68,7 +67,13 @@ public class MemoryStream {
     }
 
     public List<Memory> getMemories() {
-	return memories;
+    List<Memory> result = new ArrayList<Memory>(workingMemories);
+    result.addAll(memories);
+    return result;
+    }
+
+    public List<Observation> getWorkingMemories() {
+    return workingMemories;
     }
 
     public List<Observation> getObservations() {
@@ -90,6 +95,22 @@ public class MemoryStream {
 
     public void addAll(List<? extends Memory> memories) {
 	this.memories.addAll(memories);
+    }
+
+    public void addWorkingMemory(String description) {
+    if (description == null || description.isBlank()) {
+        return;
+    }
+
+    workingMemories.add(new Observation(description));
+    }
+
+    public void addWorkingMemory(Observation memory) {
+    if (memory == null) {
+        return;
+    }
+
+    workingMemories.add(memory);
     }
 
     public void add(Memory memory) {

@@ -186,6 +186,7 @@ agent:
     Name: {{agent.name}}
     Innate Traits: {{agent.traits}}
     Characteristics: {{agent.description}}
+    Active Continuity: {{#agent.workingMemories}}{{description}}; {{/agent.workingMemories}}
     Current Location: {{agent.locationName}}
     Goals: {{#agent.goals}}{{.}}; {{/agent.goals}}
     Rituals: {{#agent.rituals}}{{.}}; {{/agent.rituals}}
