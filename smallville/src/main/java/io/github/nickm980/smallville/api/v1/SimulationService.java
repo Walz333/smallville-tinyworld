@@ -184,7 +184,7 @@ public class SimulationService {
     }
 
     public void createMemory(CreateMemoryRequest request) {
-	Agent agent = world.getAgent(request.getName()).orElseThrow();
+	Agent agent = world.getAgent(request.getName()).orElseThrow(() -> new AgentNotFoundException(request.getName()));
 	Observation observation = new Observation(request.getDescription());
 	observation.setReactable(request.isReactable());
 	agent.getMemoryStream().add(observation);

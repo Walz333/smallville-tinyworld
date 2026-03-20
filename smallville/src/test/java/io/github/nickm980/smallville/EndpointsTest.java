@@ -261,12 +261,29 @@ public class EndpointsTest {
     @Test
     @Get("/agents/{name}")
     public void GET_agent_by_name_returns_successfully() {
-	// GET /agents/{name}
-	JavalinTest.test(app, (server, client) -> {
-	    Response response = client.get("/agents/nonexistant");
+	try {
+	    int port;
+	    try (ServerSocket serverSocket = new ServerSocket(0)) {
+		port = serverSocket.getLocalPort();
+	    }
+	    app.start(port);
+	    HttpClient httpClient = HttpClient.newHttpClient();
+	    try {
+		HttpResponse<String> response = httpClient.send(
+		    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/agents/nonexistant"))
+			.GET()
+			.build(),
+		    HttpResponse.BodyHandlers.ofString());
+		String body = response.body();
 
-	    assertEquals(500, response.code());
-	});
+		assertEquals(body, 404, response.statusCode());
+		assertTrue(body.contains("Agent not found nonexistant"));
+	    } finally {
+		app.stop();
+	    }
+	} catch (Exception e) {
+	    throw new RuntimeException(e);
+	}
     }
 
     @Test
