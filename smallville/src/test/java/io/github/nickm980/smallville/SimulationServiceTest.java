@@ -32,11 +32,14 @@ import io.github.nickm980.smallville.entities.Location;
 import io.github.nickm980.smallville.entities.WorldProposal;
 import io.github.nickm980.smallville.llm.ChatGPT;
 import io.github.nickm980.smallville.memory.Characteristic;
+import io.github.nickm980.smallville.memory.Plan;
+import io.github.nickm980.smallville.memory.PlanType;
 import io.github.nickm980.smallville.prompts.Prompts;
 import io.github.nickm980.smallville.prompts.dto.CurrentActivity;
 import io.github.nickm980.smallville.update.UpdateConversation;
 import io.github.nickm980.smallville.update.UpdateCurrentActivity;
 import io.github.nickm980.smallville.update.UpdateInfo;
+import io.github.nickm980.smallville.update.UpdatePlans;
 
 public class SimulationServiceTest {
 
@@ -251,6 +254,44 @@ public class SimulationServiceTest {
 	assertTrue(agent.getMemoryStream().getWorkingMemories().stream().anyMatch(memory -> memory.getDescription().equals("checked the propagation notes")));
 	assertTrue(agent.getMemoryStream().getObservations().stream().anyMatch(memory -> memory.getDescription().equals("brewed tea")));
 	assertTrue(agent.getMemoryStream().getObservations().stream().anyMatch(memory -> memory.getDescription().equals("checked the propagation notes")));
+    }
+
+    @Test
+    public void test_update_plans_keeps_existing_stale_short_term_plans_without_observation_trigger() {
+	World localWorld = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	localWorld.create(kitchen);
+
+	Agent agent = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "bringing tea",
+	    kitchen);
+	localWorld.create(agent);
+
+	Plan staleShortTerm = new Plan("8:00 am at the Blue House: Kitchen, prepare the tea tray", java.time.LocalDateTime.now().minusHours(2));
+	staleShortTerm.convert(PlanType.SHORT_TERM);
+	Plan longTerm = new Plan("6:00 pm at the Blue House: Kitchen, prepare dinner", java.time.LocalDateTime.now().plusHours(2));
+	longTerm.convert(PlanType.LONG_TERM);
+	agent.getMemoryStream().addAll(List.of(staleShortTerm, longTerm));
+
+	Prompts prompts = Mockito.mock(Prompts.class);
+	UpdatePlans update = new UpdatePlans();
+	UpdateInfo firstCycle = new UpdateInfo();
+	UpdateInfo secondCycle = new UpdateInfo();
+
+	assertDoesNotThrow(() -> update.update(prompts, localWorld, agent, firstCycle));
+	assertDoesNotThrow(() -> update.update(prompts, localWorld, agent, secondCycle));
+
+	List<Plan> shortPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
+	assertEquals(1, shortPlans.size());
+	assertEquals("8:00 am at the Blue House: Kitchen, prepare the tea tray", shortPlans.get(0).getDescription());
+	assertTrue(shortPlans.get(0).getTime().isBefore(java.time.LocalDateTime.now()));
+	assertFalse(firstCycle.isPlansUpdated());
+	assertFalse(secondCycle.isPlansUpdated());
+	Mockito.verify(prompts, Mockito.never()).shouldUpdatePlans(Mockito.any(), Mockito.anyString());
+	Mockito.verify(prompts, Mockito.never()).getPlans(Mockito.any());
+	Mockito.verify(prompts, Mockito.never()).getShortTermPlans(Mockito.any());
     }
 
     @Test
