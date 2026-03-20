@@ -34,6 +34,7 @@ import io.github.nickm980.smallville.llm.ChatGPT;
 import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.memory.Plan;
 import io.github.nickm980.smallville.memory.PlanType;
+import io.github.nickm980.smallville.prompts.PromptRequest;
 import io.github.nickm980.smallville.prompts.Prompts;
 import io.github.nickm980.smallville.prompts.dto.CurrentActivity;
 import io.github.nickm980.smallville.update.UpdateConversation;
@@ -45,10 +46,11 @@ public class SimulationServiceTest {
 
     private SimulationService service;
     private World world;
+	private ChatGPT llm;
 
     @BeforeEach
     public void setUp() {
-	ChatGPT llm = Mockito.mock(ChatGPT.class);
+	llm = Mockito.mock(ChatGPT.class);
 	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn("result");
 	world = new World();
 	service = new SimulationService(llm, world);
@@ -561,6 +563,122 @@ public class SimulationServiceTest {
 	assertFalse(isProposalValid(duplicate));
     }
 
+    @Test
+    public void test_update_state_queues_grounded_pending_proposal_for_eligible_agent() {
+	stubRuntimeProposalResponse(
+	    "Answer: Yes\n"
+		+ "Type: add_object\n"
+		+ "ParentLocation: Blue House: Kitchen\n"
+		+ "Name: Tea Tray Shelf\n"
+		+ "ProposedState: organized\n"
+		+ "Reason: To keep the tea setup tidy during the morning round.");
+
+	createProposalAgent("Rowan", true);
+
+	assertDoesNotThrow(() -> service.updateState());
+
+	List<WorldSnapshotResponse.WorldProposalResponse> rowanProposals = service.getWorldProposals().stream()
+	    .filter(proposal -> proposal.getAgent().equals("Rowan"))
+	    .toList();
+
+	assertEquals(1, rowanProposals.size());
+	assertEquals("pending", rowanProposals.get(0).getStatus());
+	assertEquals("add_object", rowanProposals.get(0).getType());
+	assertEquals("Blue House: Kitchen", rowanProposals.get(0).getParentLocation());
+	assertEquals("Tea Tray Shelf", rowanProposals.get(0).getName());
+	assertEquals("To keep the tea setup tidy during the morning round.", rowanProposals.get(0).getReason());
+    }
+
+    @Test
+    public void test_existing_pending_proposal_suppresses_another_runtime_proposal_from_same_agent() throws Exception {
+	stubRuntimeProposalResponse(
+	    "Answer: Yes\n"
+		+ "Type: add_object\n"
+		+ "ParentLocation: Blue House: Kitchen\n"
+		+ "Name: Backup Tea Shelf\n"
+		+ "ProposedState: organized\n"
+		+ "Reason: To keep backup cups nearby.");
+
+	createProposalAgent("Rowan", true);
+	WorldProposal existing = newProposal("add_object", "Blue House: Kitchen", "Tea Tray Shelf", null, "To keep the tea setup tidy during the morning round.");
+	existing.setAgent("Rowan");
+	addPendingProposal(existing);
+
+	assertDoesNotThrow(() -> service.updateState());
+
+	List<WorldSnapshotResponse.WorldProposalResponse> rowanProposals = service.getWorldProposals().stream()
+	    .filter(proposal -> proposal.getAgent().equals("Rowan"))
+	    .toList();
+
+	assertEquals(1, rowanProposals.size());
+	assertEquals("Tea Tray Shelf", rowanProposals.get(0).getName());
+	assertEquals("pending", rowanProposals.get(0).getStatus());
+    }
+
+    @Test
+    public void test_existing_approved_proposal_suppresses_another_runtime_proposal_from_same_agent() throws Exception {
+	stubRuntimeProposalResponse(
+	    "Answer: Yes\n"
+		+ "Type: add_object\n"
+		+ "ParentLocation: Blue House: Kitchen\n"
+		+ "Name: Backup Tea Shelf\n"
+		+ "ProposedState: organized\n"
+		+ "Reason: To keep backup cups nearby.");
+
+	createProposalAgent("Rowan", true);
+	WorldProposal existing = newProposal("add_object", "Blue House: Kitchen", "Tea Tray Shelf", null, "To keep the tea setup tidy during the morning round.");
+	existing.setAgent("Rowan");
+	existing.setStatus("approved");
+	addPendingProposal(existing);
+
+	assertDoesNotThrow(() -> service.updateState());
+
+	List<WorldSnapshotResponse.WorldProposalResponse> rowanProposals = service.getWorldProposals().stream()
+	    .filter(proposal -> proposal.getAgent().equals("Rowan"))
+	    .toList();
+
+	assertEquals(1, rowanProposals.size());
+	assertEquals("Tea Tray Shelf", rowanProposals.get(0).getName());
+	assertEquals("approved", rowanProposals.get(0).getStatus());
+    }
+
+    @Test
+    public void test_update_state_does_not_queue_proposal_for_agent_without_capability() {
+	stubRuntimeProposalResponse(
+	    "Answer: Yes\n"
+		+ "Type: add_object\n"
+		+ "ParentLocation: Blue House: Kitchen\n"
+		+ "Name: Tea Tray Shelf\n"
+		+ "ProposedState: organized\n"
+		+ "Reason: To keep the tea setup tidy during the morning round.");
+
+	createProposalAgent("Rowan", false);
+
+	assertDoesNotThrow(() -> service.updateState());
+
+	assertEquals(0, service.getWorldProposals().stream()
+	    .filter(proposal -> proposal.getAgent().equals("Rowan"))
+	    .count());
+    }
+
+    @Test
+    public void test_update_state_discards_incomplete_proposal_output() {
+	stubRuntimeProposalResponse(
+	    "Answer: Yes\n"
+		+ "Type: add_object\n"
+		+ "ParentLocation: Blue House: Kitchen\n"
+		+ "Name: Tea Tray Shelf\n"
+		+ "ProposedState: organized");
+
+	createProposalAgent("Rowan", true);
+
+	assertDoesNotThrow(() -> service.updateState());
+
+	assertEquals(0, service.getWorldProposals().stream()
+	    .filter(proposal -> proposal.getAgent().equals("Rowan"))
+	    .count());
+    }
+
     private void createLocation(String name) {
 	if (world.getLocation(name).isPresent()) {
 	    return;
@@ -570,6 +688,59 @@ public class SimulationServiceTest {
 	request.setName(name);
 	service.createLocation(request);
     }
+
+	private void createProposalAgent(String name, boolean canProposeWorldChanges) {
+	CreateAgentRequest createAgent = new CreateAgentRequest();
+	createAgent.setActivity("organizing the tea things");
+	createAgent.setLocation("Blue House: Kitchen");
+	createAgent.setMemories(List.of(name + " keeps the kitchen orderly"));
+	createAgent.setGoals(List.of("keep the kitchen orderly"));
+	createAgent.setRituals(List.of("morning tea setup"));
+	createAgent.setTraits("steady, practical, observant");
+	createAgent.setName(name);
+	createAgent.setCanProposeWorldChanges(canProposeWorldChanges);
+	service.createAgent(createAgent);
+	}
+
+	private void stubRuntimeProposalResponse(String proposalResponse) {
+	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenAnswer(invocation -> {
+	    PromptRequest prompt = invocation.getArgument(0);
+	    String content = prompt.getContent();
+
+	    if (content.contains("On the scale of 1 to 10")) {
+		return "[1,1,1,1,1,1]";
+	    }
+
+	    if (content.contains("Break down") && content.contains("plan for the next hour")) {
+		return "8:00 am at the Blue House: Kitchen, organize the tea tray";
+	    }
+
+	    if (content.contains("Today is Wednesday February 13")) {
+		return "8:00 am at the Blue House: Kitchen, wake up and open the curtains\n"
+		    + "9:00 am at the Blue House: Kitchen, prepare tea for the morning round";
+	    }
+
+	    if (content.contains("What is your activity at")) {
+		return "Activity: organizing the tea tray\n"
+		    + "Location: Blue House: Kitchen\n"
+		    + "Emoji: tea";
+	    }
+
+	    if (content.contains("Given only the information above, what are 3 most salient high-level questions")) {
+		return "- What should Rowan tend next?\n- Who needs tea next?\n- Which part of the kitchen needs organizing?";
+	    }
+
+	    if (content.contains("What single high-level insight can you infer")) {
+		return "Rowan keeps the kitchen orderly (because of 1, 2, 3)";
+	    }
+
+	    if (content.contains("wants to propose one grounded world change")) {
+		return proposalResponse;
+	    }
+
+	    return "result";
+	});
+	}
 
     private WorldProposal newProposal(String type, String parentLocation, String name, String proposedState, String reason) {
 	WorldProposal proposal = new WorldProposal();
