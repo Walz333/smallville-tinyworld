@@ -564,6 +564,77 @@ public class SimulationServiceTest {
     }
 
     @Test
+    public void test_approve_world_proposal_applies_add_location_and_clears_pending_review() throws Exception {
+	createLocation("Garden");
+
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	assertTrue(isProposalValid(proposal));
+	addPendingProposal(proposal);
+
+	WorldSnapshotResponse.WorldProposalResponse approved = service.approveWorldProposal(proposal.getId());
+
+	assertEquals("applied", approved.getStatus());
+	assertTrue(world.getLocation("Garden: North Arbor").isPresent());
+	assertEquals("ready", world.getLocation("Garden: North Arbor").orElseThrow().getState());
+	assertTrue(service.getWorldProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getLocations().stream().anyMatch(location -> location.getName().equals("Garden: North Arbor") && "ready".equals(location.getState())));
+    }
+
+    @Test
+    public void test_approve_world_proposal_applies_add_object_and_clears_pending_review() throws Exception {
+	createLocation("Blue House: Kitchen");
+
+	WorldProposal proposal = newProposal("add_object", "Blue House: Kitchen", "Tea Tray Shelf", "organized", "To keep the tea setup tidy during the morning round.");
+	assertTrue(isProposalValid(proposal));
+	addPendingProposal(proposal);
+
+	WorldSnapshotResponse.WorldProposalResponse approved = service.approveWorldProposal(proposal.getId());
+
+	assertEquals("applied", approved.getStatus());
+	assertTrue(world.getLocation("Blue House: Kitchen: Tea Tray Shelf").isPresent());
+	assertEquals("organized", world.getLocation("Blue House: Kitchen: Tea Tray Shelf").orElseThrow().getState());
+	assertTrue(service.getWorldProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getLocations().stream().anyMatch(location -> location.getName().equals("Blue House: Kitchen: Tea Tray Shelf") && "organized".equals(location.getState())));
+    }
+
+    @Test
+    public void test_approve_world_proposal_applies_change_state_and_clears_pending_review() throws Exception {
+	createLocation("Green House: Glass Table");
+	service.setState("Green House: Glass Table", "crowded");
+
+	WorldProposal proposal = newProposal("change_state", null, "Green House: Glass Table", "cleared", "To mark the work surface ready for propagation.");
+	assertTrue(isProposalValid(proposal));
+	addPendingProposal(proposal);
+
+	WorldSnapshotResponse.WorldProposalResponse approved = service.approveWorldProposal(proposal.getId());
+
+	assertEquals("applied", approved.getStatus());
+	assertEquals("cleared", world.getLocation("Green House: Glass Table").orElseThrow().getState());
+	assertTrue(service.getWorldProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getLocations().stream().anyMatch(location -> location.getName().equals("Green House: Glass Table") && "cleared".equals(location.getState())));
+    }
+
+    @Test
+    public void test_reject_world_proposal_clears_pending_review_without_applying_world_change() throws Exception {
+	createLocation("Garden");
+
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	assertTrue(isProposalValid(proposal));
+	addPendingProposal(proposal);
+
+	WorldSnapshotResponse.WorldProposalResponse rejected = service.rejectWorldProposal(proposal.getId());
+
+	assertEquals("rejected", rejected.getStatus());
+	assertTrue(world.getLocation("Garden: North Arbor").isEmpty());
+	assertTrue(service.getWorldProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(service.getWorldSnapshot().getLocations().stream().noneMatch(location -> location.getName().equals("Garden: North Arbor")));
+    }
+
+    @Test
     public void test_update_state_queues_grounded_pending_proposal_for_eligible_agent() {
 	stubRuntimeProposalResponse(
 	    "Answer: Yes\n"
