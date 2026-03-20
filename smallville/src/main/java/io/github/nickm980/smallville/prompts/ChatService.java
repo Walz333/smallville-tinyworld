@@ -341,7 +341,7 @@ public class ChatService implements Prompts {
 	LOG.debug("[Reflections] Question: " + query);
 
 	Set<Memory> filter = new HashSet<Memory>();
-	filter.addAll(agent.getMemoryStream().getRelevantMemories(query.substring(2)));
+	filter.addAll(agent.getMemoryStream().getRelevantMemories(query));
 	List<Memory> memories = new ArrayList<>(filter); // Convert the set back to a list
 
 	LOG.debug(String.join(",", memories.stream().map(m -> m.getDescription()).collect(Collectors.toList())));
