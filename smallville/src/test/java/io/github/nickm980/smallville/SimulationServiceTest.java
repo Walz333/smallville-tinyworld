@@ -257,7 +257,7 @@ public class SimulationServiceTest {
     }
 
     @Test
-    public void test_update_plans_keeps_existing_stale_short_term_plans_without_observation_trigger() {
+    public void test_update_plans_refreshes_stale_short_term_plans_without_touching_long_term_plans() {
 	World localWorld = new World();
 	Location kitchen = new Location("Blue House: Kitchen");
 	localWorld.create(kitchen);
@@ -274,24 +274,27 @@ public class SimulationServiceTest {
 	Plan longTerm = new Plan("6:00 pm at the Blue House: Kitchen, prepare dinner", java.time.LocalDateTime.now().plusHours(2));
 	longTerm.convert(PlanType.LONG_TERM);
 	agent.getMemoryStream().addAll(List.of(staleShortTerm, longTerm));
+	Plan refreshedShortTerm = new Plan("10:30 am at the Blue House: Kitchen, refresh the tea tray", java.time.LocalDateTime.now().plusMinutes(30));
+	refreshedShortTerm.convert(PlanType.SHORT_TERM);
 
 	Prompts prompts = Mockito.mock(Prompts.class);
+	Mockito.when(prompts.getShortTermPlans(agent)).thenReturn(List.of(refreshedShortTerm));
 	UpdatePlans update = new UpdatePlans();
-	UpdateInfo firstCycle = new UpdateInfo();
-	UpdateInfo secondCycle = new UpdateInfo();
+	UpdateInfo cycle = new UpdateInfo();
 
-	assertDoesNotThrow(() -> update.update(prompts, localWorld, agent, firstCycle));
-	assertDoesNotThrow(() -> update.update(prompts, localWorld, agent, secondCycle));
+	assertDoesNotThrow(() -> update.update(prompts, localWorld, agent, cycle));
 
 	List<Plan> shortPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
 	assertEquals(1, shortPlans.size());
-	assertEquals("8:00 am at the Blue House: Kitchen, prepare the tea tray", shortPlans.get(0).getDescription());
-	assertTrue(shortPlans.get(0).getTime().isBefore(java.time.LocalDateTime.now()));
-	assertFalse(firstCycle.isPlansUpdated());
-	assertFalse(secondCycle.isPlansUpdated());
+	assertEquals("10:30 am at the Blue House: Kitchen, refresh the tea tray", shortPlans.get(0).getDescription());
+	assertTrue(shortPlans.get(0).getTime().isAfter(java.time.LocalDateTime.now()));
+	assertFalse(shortPlans.stream().anyMatch(plan -> plan.getDescription().equals("8:00 am at the Blue House: Kitchen, prepare the tea tray")));
+	assertEquals(1, agent.getMemoryStream().getPlans(PlanType.LONG_TERM).size());
+	assertEquals("6:00 pm at the Blue House: Kitchen, prepare dinner", agent.getMemoryStream().getPlans(PlanType.LONG_TERM).get(0).getDescription());
+	assertTrue(cycle.isPlansUpdated());
 	Mockito.verify(prompts, Mockito.never()).shouldUpdatePlans(Mockito.any(), Mockito.anyString());
 	Mockito.verify(prompts, Mockito.never()).getPlans(Mockito.any());
-	Mockito.verify(prompts, Mockito.never()).getShortTermPlans(Mockito.any());
+	Mockito.verify(prompts, Mockito.times(1)).getShortTermPlans(agent);
     }
 
     @Test

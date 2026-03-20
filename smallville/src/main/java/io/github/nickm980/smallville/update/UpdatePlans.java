@@ -1,5 +1,6 @@
 package io.github.nickm980.smallville.update;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,8 +25,11 @@ public class UpdatePlans extends AgentUpdate {
     @Override
     public boolean update(Prompts converter, World world, Agent agent, UpdateInfo info) {
 	LOG.info("[Plans] Updating plans...");
+	LocalDateTime now = LocalDateTime.now();
 	boolean hasPlans = !agent.getMemoryStream().getPlans().isEmpty();
 	boolean shouldUpdatePlans = !hasPlans;
+	boolean hasStaleShortTermPlans = hasOnlyExpiredShortTermPlans(agent, now);
+	boolean plansUpdated = shouldUpdatePlans;
 	String observation = info.getObservation();
 	
 	if (observation != null && !observation.isEmpty()) {
@@ -41,6 +45,11 @@ public class UpdatePlans extends AgentUpdate {
 	    agent.getMemoryStream().prunePlans(PlanType.SHORT_TERM);
 	    updatePlans(converter, agent, PlanType.LONG_TERM);
 	    updatePlans(converter, agent, PlanType.SHORT_TERM);
+	} else if (hasStaleShortTermPlans) {
+	    LOG.info("[Plans] Refreshing stale short term plans");
+	    agent.getMemoryStream().prunePlans(PlanType.SHORT_TERM);
+	    updatePlans(converter, agent, PlanType.SHORT_TERM);
+	    plansUpdated = true;
 	}
 
 	if (agent.getMemoryStream().getPlans(PlanType.LONG_TERM).isEmpty()) {
@@ -53,9 +62,14 @@ public class UpdatePlans extends AgentUpdate {
 
 	LOG.info("[Plans] Plans updated");
 
-	info.setPlansUpdated(shouldUpdatePlans);
+	info.setPlansUpdated(plansUpdated);
 	return next(converter, world, agent, info);
     }
+
+    private boolean hasOnlyExpiredShortTermPlans(Agent agent, LocalDateTime now) {
+	List<Plan> shortTermPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
+	return !shortTermPlans.isEmpty() && shortTermPlans.stream().allMatch(plan -> plan.getTime().isBefore(now));
+	}
 
     private void updatePlans(Prompts converter, Agent agent, PlanType type) {
 	List<Plan> plans = type == PlanType.LONG_TERM ? converter.getPlans(agent) : converter.getShortTermPlans(agent);
