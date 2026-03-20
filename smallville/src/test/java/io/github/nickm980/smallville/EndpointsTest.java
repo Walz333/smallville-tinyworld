@@ -1,15 +1,20 @@
 package io.github.nickm980.smallville;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import java.lang.reflect.Field;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -18,6 +23,8 @@ import org.mockito.Mockito;
 
 import io.github.nickm980.smallville.analytics.Analytics;
 import io.github.nickm980.smallville.api.SmallvilleServer;
+import io.github.nickm980.smallville.api.v1.SimulationService;
+import io.github.nickm980.smallville.entities.WorldProposal;
 import io.github.nickm980.smallville.llm.ChatGPT;
 import io.javalin.Javalin;
 import io.javalin.community.routing.annotations.Get;
@@ -26,12 +33,14 @@ import okhttp3.Response;
 
 public class EndpointsTest {
     private Javalin app;
+    private SmallvilleServer smallvilleServer;
 
     @BeforeEach
     public void setUp() {
 	ChatGPT llm = Mockito.mock(ChatGPT.class);
 	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn("result");
-	app = new SmallvilleServer(new Analytics(), llm, new World()).server();
+	smallvilleServer = new SmallvilleServer(new Analytics(), llm, new World());
+	app = smallvilleServer.server();
     }
 
     @Test
@@ -156,6 +165,66 @@ public class EndpointsTest {
     }
 
     @Test
+    public void POST_approve_proposal_preserves_snapshot_action_history_and_pending_visibility() throws Exception {
+	SimulationService service = getService();
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	addPendingProposal(service, proposal);
+
+	JavalinTest.test(app, (server, client) -> {
+	    Response approveResponse = client.post("/world/proposals/" + proposal.getId() + "/approve");
+	    JSONObject approveBody = new JSONObject(approveResponse.body().string());
+	    JSONObject proposalBody = approveBody.getJSONObject("proposal");
+	    Response worldResponse = client.get("/world");
+	    JSONObject worldBody = new JSONObject(worldResponse.body().string());
+	    JSONArray actionLog = worldBody.getJSONArray("actionLog");
+	    JSONArray pendingProposals = worldBody.getJSONArray("pendingProposals");
+	    JSONArray locations = worldBody.getJSONArray("locations");
+
+	    assertEquals(200, approveResponse.code());
+	    assertEquals(true, approveBody.get("success"));
+	    assertEquals("applied", proposalBody.get("status"));
+	    assertEquals(200, worldResponse.code());
+	    assertEquals("proposal-applied", actionLog.getJSONObject(0).get("type"));
+	    assertEquals("Applied add_location Garden: North Arbor", actionLog.getJSONObject(0).get("summary"));
+	    assertEquals("Garden", actionLog.getJSONObject(0).get("fromLocation"));
+	    assertEquals("Garden: North Arbor", actionLog.getJSONObject(0).get("toLocation"));
+	    assertEquals("proposal-approved", actionLog.getJSONObject(1).get("type"));
+	    assertEquals("Approved add_location Garden: North Arbor", actionLog.getJSONObject(1).get("summary"));
+	    assertFalse(containsProposal(pendingProposals, proposal.getId()));
+	    assertTrue(containsLocationWithState(locations, "Garden: North Arbor", "ready"));
+	});
+    }
+
+    @Test
+    public void POST_reject_proposal_preserves_snapshot_action_history_without_world_mutation() throws Exception {
+	SimulationService service = getService();
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	addPendingProposal(service, proposal);
+
+	JavalinTest.test(app, (server, client) -> {
+	    Response rejectResponse = client.post("/world/proposals/" + proposal.getId() + "/reject");
+	    JSONObject rejectBody = new JSONObject(rejectResponse.body().string());
+	    JSONObject proposalBody = rejectBody.getJSONObject("proposal");
+	    Response worldResponse = client.get("/world");
+	    JSONObject worldBody = new JSONObject(worldResponse.body().string());
+	    JSONArray actionLog = worldBody.getJSONArray("actionLog");
+	    JSONArray pendingProposals = worldBody.getJSONArray("pendingProposals");
+	    JSONArray locations = worldBody.getJSONArray("locations");
+
+	    assertEquals(200, rejectResponse.code());
+	    assertEquals(true, rejectBody.get("success"));
+	    assertEquals("rejected", proposalBody.get("status"));
+	    assertEquals(200, worldResponse.code());
+	    assertEquals("proposal-rejected", actionLog.getJSONObject(0).get("type"));
+	    assertEquals("Rejected add_location Garden: North Arbor", actionLog.getJSONObject(0).get("summary"));
+	    assertEquals("Garden", actionLog.getJSONObject(0).get("fromLocation"));
+	    assertEquals("Garden: North Arbor", actionLog.getJSONObject(0).get("toLocation"));
+	    assertFalse(containsProposal(pendingProposals, proposal.getId()));
+	    assertFalse(containsLocation(locations, "Garden: North Arbor"));
+	});
+    }
+
+    @Test
     public void GET_models_returns_runtime_model_state() {
 	JavalinTest.test(app, (server, client) -> {
 	    Response response = client.get("/models");
@@ -213,5 +282,61 @@ public class EndpointsTest {
 	    assertNotNull(body.get("agents"));
 	    assertNotNull(body.get("conversations"));
 	});
+    }
+
+    private SimulationService getService() throws Exception {
+	Field field = SmallvilleServer.class.getDeclaredField("service");
+	field.setAccessible(true);
+	return (SimulationService) field.get(smallvilleServer);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addPendingProposal(SimulationService service, WorldProposal proposal) throws Exception {
+	Field field = SimulationService.class.getDeclaredField("proposals");
+	field.setAccessible(true);
+	List<WorldProposal> proposals = (List<WorldProposal>) field.get(service);
+	proposals.add(proposal);
+    }
+
+    private WorldProposal newProposal(String type, String parentLocation, String name, String proposedState, String reason) {
+	WorldProposal proposal = new WorldProposal();
+	proposal.setId(UUID.randomUUID().toString());
+	proposal.setAgent("Jamie");
+	proposal.setType(type);
+	proposal.setParentLocation(parentLocation);
+	proposal.setName(name);
+	proposal.setProposedState(proposedState);
+	proposal.setReason(reason);
+	proposal.setStatus("pending");
+	proposal.setCreatedAtTick(0);
+	return proposal;
+    }
+
+    private boolean containsProposal(JSONArray proposals, String proposalId) {
+	for (int i = 0; i < proposals.length(); i++) {
+	    if (proposalId.equals(proposals.getJSONObject(i).getString("id"))) {
+		return true;
+	    }
+	}
+	return false;
+    }
+
+    private boolean containsLocation(JSONArray locations, String name) {
+	for (int i = 0; i < locations.length(); i++) {
+	    if (name.equals(locations.getJSONObject(i).getString("name"))) {
+		return true;
+	    }
+	}
+	return false;
+    }
+
+    private boolean containsLocationWithState(JSONArray locations, String name, String state) {
+	for (int i = 0; i < locations.length(); i++) {
+	    JSONObject location = locations.getJSONObject(i);
+	    if (name.equals(location.getString("name")) && state.equals(location.optString("state"))) {
+		return true;
+	    }
+	}
+	return false;
     }
 }
