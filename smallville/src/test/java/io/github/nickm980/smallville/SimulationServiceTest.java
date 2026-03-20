@@ -618,6 +618,33 @@ public class SimulationServiceTest {
     }
 
     @Test
+    public void test_approve_world_proposal_records_approval_and_applied_actions_in_newest_first_order() throws Exception {
+	createLocation("Garden");
+
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	assertTrue(isProposalValid(proposal));
+	addPendingProposal(proposal);
+	int initialActionCount = service.getWorldSnapshot().getActionLog().size();
+
+	service.approveWorldProposal(proposal.getId());
+
+	List<WorldSnapshotResponse.ActionLogResponse> actionLog = service.getWorldSnapshot().getActionLog();
+	assertEquals(initialActionCount + 2, actionLog.size());
+	assertEquals("proposal-applied", actionLog.get(0).getType());
+	assertEquals("World", actionLog.get(0).getActor());
+	assertEquals("Applied add_location Garden: North Arbor", actionLog.get(0).getSummary());
+	assertEquals("Garden", actionLog.get(0).getFromLocation());
+	assertEquals("Garden: North Arbor", actionLog.get(0).getToLocation());
+	assertEquals("proposal-approved", actionLog.get(1).getType());
+	assertEquals("World", actionLog.get(1).getActor());
+	assertEquals("Approved add_location Garden: North Arbor", actionLog.get(1).getSummary());
+	assertEquals("Garden", actionLog.get(1).getFromLocation());
+	assertEquals("Garden: North Arbor", actionLog.get(1).getToLocation());
+	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(world.getLocation("Garden: North Arbor").isPresent());
+    }
+
+    @Test
     public void test_reject_world_proposal_clears_pending_review_without_applying_world_change() throws Exception {
 	createLocation("Garden");
 
@@ -632,6 +659,28 @@ public class SimulationServiceTest {
 	assertTrue(service.getWorldProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
 	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
 	assertTrue(service.getWorldSnapshot().getLocations().stream().noneMatch(location -> location.getName().equals("Garden: North Arbor")));
+    }
+
+    @Test
+    public void test_reject_world_proposal_records_rejection_action_in_snapshot_history() throws Exception {
+	createLocation("Garden");
+
+	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
+	assertTrue(isProposalValid(proposal));
+	addPendingProposal(proposal);
+	int initialActionCount = service.getWorldSnapshot().getActionLog().size();
+
+	service.rejectWorldProposal(proposal.getId());
+
+	List<WorldSnapshotResponse.ActionLogResponse> actionLog = service.getWorldSnapshot().getActionLog();
+	assertEquals(initialActionCount + 1, actionLog.size());
+	assertEquals("proposal-rejected", actionLog.get(0).getType());
+	assertEquals("World", actionLog.get(0).getActor());
+	assertEquals("Rejected add_location Garden: North Arbor", actionLog.get(0).getSummary());
+	assertEquals("Garden", actionLog.get(0).getFromLocation());
+	assertEquals("Garden: North Arbor", actionLog.get(0).getToLocation());
+	assertTrue(service.getWorldSnapshot().getPendingProposals().stream().noneMatch(candidate -> candidate.getId().equals(proposal.getId())));
+	assertTrue(world.getLocation("Garden: North Arbor").isEmpty());
     }
 
     @Test
