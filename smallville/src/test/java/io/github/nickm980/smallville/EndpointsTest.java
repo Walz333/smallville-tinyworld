@@ -182,7 +182,7 @@ public class EndpointsTest {
 
 	    assertEquals(200, approveResponse.code());
 	    assertEquals(true, approveBody.get("success"));
-	    assertEquals("applied", proposalBody.get("status"));
+	    assertProposalPayload(proposalBody, proposal, "applied");
 	    assertEquals(200, worldResponse.code());
 	    assertEquals("proposal-applied", actionLog.getJSONObject(0).get("type"));
 	    assertEquals("Applied add_location Garden: North Arbor", actionLog.getJSONObject(0).get("summary"));
@@ -213,7 +213,7 @@ public class EndpointsTest {
 
 	    assertEquals(200, rejectResponse.code());
 	    assertEquals(true, rejectBody.get("success"));
-	    assertEquals("rejected", proposalBody.get("status"));
+	    assertProposalPayload(proposalBody, proposal, "rejected");
 	    assertEquals(200, worldResponse.code());
 	    assertEquals("proposal-rejected", actionLog.getJSONObject(0).get("type"));
 	    assertEquals("Rejected add_location Garden: North Arbor", actionLog.getJSONObject(0).get("summary"));
@@ -310,6 +310,18 @@ public class EndpointsTest {
 	proposal.setStatus("pending");
 	proposal.setCreatedAtTick(0);
 	return proposal;
+    }
+
+    private void assertProposalPayload(JSONObject proposalBody, WorldProposal proposal, String expectedStatus) {
+	assertEquals(proposal.getId(), proposalBody.getString("id"));
+	assertEquals(proposal.getAgent(), proposalBody.getString("agent"));
+	assertEquals(proposal.getType(), proposalBody.getString("type"));
+	assertEquals(proposal.getParentLocation(), proposalBody.getString("parentLocation"));
+	assertEquals(proposal.getName(), proposalBody.getString("name"));
+	assertEquals(proposal.getProposedState(), proposalBody.getString("proposedState"));
+	assertEquals(proposal.getReason(), proposalBody.getString("reason"));
+	assertEquals(expectedStatus, proposalBody.getString("status"));
+	assertEquals(proposal.getCreatedAtTick(), proposalBody.getInt("createdAtTick"));
     }
 
     private boolean containsProposal(JSONArray proposals, String proposalId) {
