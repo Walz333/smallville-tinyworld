@@ -65,6 +65,60 @@ public class ChatServiceTest {
     }
 
     @Test
+    public void test_get_current_activity_strips_exact_duplicate_location_suffix() {
+	World world = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	world.create(kitchen);
+
+	Agent agent = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "checking on seedlings",
+	    kitchen);
+
+	LLM llm = Mockito.mock(LLM.class);
+	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn(
+	    "Activity: checking on seedlings at Blue House: Kitchen\n"
+		+ "Location: Blue House: Kitchen\n"
+		+ "Emoji: sprout");
+
+	ChatService service = new ChatService(world, llm);
+
+	CurrentActivity result = service.getCurrentActivity(agent);
+
+	assertEquals("checking on seedlings", result.getActivity());
+	assertEquals("Blue House: Kitchen", result.getLocation());
+	assertEquals("sprout", result.getEmoji());
+    }
+
+    @Test
+    public void test_get_current_activity_preserves_non_duplicate_location_wording() {
+	World world = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	world.create(kitchen);
+
+	Agent agent = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "checking on seedlings",
+	    kitchen);
+
+	LLM llm = Mockito.mock(LLM.class);
+	Mockito.when(llm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn(
+	    "Activity: checking on seedlings beside Blue House: Kitchen\n"
+		+ "Location: Blue House: Kitchen\n"
+		+ "Emoji: sprout");
+
+	ChatService service = new ChatService(world, llm);
+
+	CurrentActivity result = service.getCurrentActivity(agent);
+
+	assertEquals("checking on seedlings beside Blue House: Kitchen", result.getActivity());
+	assertEquals("Blue House: Kitchen", result.getLocation());
+	assertEquals("sprout", result.getEmoji());
+    }
+
+    @Test
     public void test_create_reflection_for_uses_once_trimmed_question_for_relevant_memories() throws Exception {
 	World world = new World();
 	Location kitchen = new Location("Blue House: Kitchen");

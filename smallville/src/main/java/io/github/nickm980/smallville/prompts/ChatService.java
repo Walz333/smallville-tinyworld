@@ -163,9 +163,10 @@ public class ChatService implements Prompts {
 	if (activity == null) {
 	    activity = new CurrentActivity();
 	}
-	LOG.info("{} {}", activity.getActivity(), activity.getLocation());
+	String normalizedActivity = normalizeDuplicateActivityLocation(activity.getActivity(), activity.getLocation());
+	LOG.info("{} {}", normalizedActivity, activity.getLocation());
 	activity.setLastActivity(nlp.convertToPastTense(agent.getCurrentActivity()));
-	activity.setActivity(normalizeMealLanguage(activity.getActivity(), SimulationTime.now()));
+	activity.setActivity(normalizeMealLanguage(normalizedActivity, SimulationTime.now()));
 
 	return activity;
     }
@@ -457,6 +458,25 @@ public class ChatService implements Prompts {
 	});
 
 	return candidate.getType() == null && candidate.getName() == null && candidate.getReason() == null ? null : candidate;
+    }
+
+    private String normalizeDuplicateActivityLocation(String activityText, String locationText) {
+	if (activityText == null || locationText == null) {
+	    return activityText;
+	}
+
+	String trimmedActivity = activityText.trim();
+	String trimmedLocation = locationText.trim();
+	if (trimmedActivity.isBlank() || trimmedLocation.isBlank()) {
+	    return activityText;
+	}
+
+	String redundantSuffix = " at " + trimmedLocation;
+	if (trimmedActivity.endsWith(redundantSuffix)) {
+	    return trimmedActivity.substring(0, trimmedActivity.length() - redundantSuffix.length()).trim();
+	}
+
+	return activityText;
     }
 
     private String normalizeMealLanguage(String text, LocalDateTime time) {
