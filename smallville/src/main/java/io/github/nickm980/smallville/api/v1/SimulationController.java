@@ -25,6 +25,7 @@ import com.google.gson.reflect.TypeToken;
 import io.github.nickm980.smallville.analytics.Analytics;
 import io.github.nickm980.smallville.api.v1.dto.*;
 import io.github.nickm980.smallville.entities.SimulationTime;
+import io.github.nickm980.smallville.exceptions.SmallvilleException;
 import io.javalin.community.routing.annotations.Endpoints;
 import io.javalin.community.routing.annotations.Get;
 import io.javalin.community.routing.annotations.Param;
@@ -136,12 +137,20 @@ public final class SimulationController {
 
     @Post("/world/proposals/{id}/approve")
     public void approveWorldProposal(Context ctx) {
-	ctx.json(Map.of("success", true, "proposal", service.approveWorldProposal(ctx.pathParam("id"))));
+	try {
+	    ctx.json(Map.of("success", true, "proposal", service.approveWorldProposal(ctx.pathParam("id"))));
+	} catch (SmallvilleException e) {
+	    ctx.status(400).json(Map.of("error", e.getMessage()));
+	}
     }
 
     @Post("/world/proposals/{id}/reject")
     public void rejectWorldProposal(Context ctx) {
-	ctx.json(Map.of("success", true, "proposal", service.rejectWorldProposal(ctx.pathParam("id"))));
+	try {
+	    ctx.json(Map.of("success", true, "proposal", service.rejectWorldProposal(ctx.pathParam("id"))));
+	} catch (SmallvilleException e) {
+	    ctx.status(400).json(Map.of("error", e.getMessage()));
+	}
     }
 
     @Get("/models")

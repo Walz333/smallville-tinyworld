@@ -196,6 +196,17 @@ public class EndpointsTest {
     }
 
     @Test
+    public void POST_approve_proposal_with_invalid_id_returns_smallville_error_contract() {
+	JavalinTest.test(app, (server, client) -> {
+	    Response response = client.post("/world/proposals/not-a-real-id/approve");
+	    JSONObject body = new JSONObject(response.body().string());
+
+	    assertEquals(400, response.code());
+	    assertEquals("Proposal not found", body.getString("error"));
+	});
+    }
+
+    @Test
     public void POST_reject_proposal_preserves_snapshot_action_history_without_world_mutation() throws Exception {
 	SimulationService service = getService();
 	WorldProposal proposal = newProposal("add_location", "Garden", "North Arbor", "ready", "To keep the watering route organized.");
@@ -221,6 +232,17 @@ public class EndpointsTest {
 	    assertEquals("Garden: North Arbor", actionLog.getJSONObject(0).get("toLocation"));
 	    assertFalse(containsProposal(pendingProposals, proposal.getId()));
 	    assertFalse(containsLocation(locations, "Garden: North Arbor"));
+	});
+    }
+
+    @Test
+    public void POST_reject_proposal_with_invalid_id_returns_smallville_error_contract() {
+	JavalinTest.test(app, (server, client) -> {
+	    Response response = client.post("/world/proposals/not-a-real-id/reject");
+	    JSONObject body = new JSONObject(response.body().string());
+
+	    assertEquals(400, response.code());
+	    assertEquals("Proposal not found", body.getString("error"));
 	});
     }
 
