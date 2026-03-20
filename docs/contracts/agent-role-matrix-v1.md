@@ -6,6 +6,16 @@ This note defines the allowed roles for UEIA Autonomous Ops Trial Phase 1.
 
 All roles are bounded to shadow-mode work only. No role has execution rights, runtime mutation rights, or automatic approval rights.
 
+## External Control Context
+
+This matrix defines UEIA specialist roles only.
+
+It does not define the top command-and-control layer for the wider SmallVille / UEIA working model.
+
+Top control authority, human gate authority, explorer-lead placement, and sub-agent restrictions are defined separately in `docs/contracts/smallville-ueia-control-model-org-chart-v1.md`.
+
+Every role in this matrix remains subordinate to that top control model and may not be read as command-interface authority or final approval authority.
+
 ## Shared Role Guardrails
 
 All roles must preserve:
