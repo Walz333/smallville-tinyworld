@@ -298,6 +298,45 @@ public class SimulationServiceTest {
     }
 
     @Test
+    public void test_update_plans_keeps_mixed_short_term_family_when_one_entry_is_still_future_relevant() {
+	World localWorld = new World();
+	Location kitchen = new Location("Blue House: Kitchen");
+	localWorld.create(kitchen);
+
+	Agent agent = new Agent(
+	    "Jamie",
+	    List.of(new Characteristic("grounded"), new Characteristic("hospitable")),
+	    "bringing tea",
+	    kitchen);
+	localWorld.create(agent);
+
+	Plan expiredShortTerm = new Plan("8:00 am at the Blue House: Kitchen, clear the cups", java.time.LocalDateTime.now().minusHours(2));
+	expiredShortTerm.convert(PlanType.SHORT_TERM);
+	Plan futureShortTerm = new Plan("10:30 am at the Blue House: Kitchen, pour fresh tea", java.time.LocalDateTime.now().plusMinutes(30));
+	futureShortTerm.convert(PlanType.SHORT_TERM);
+	Plan longTerm = new Plan("6:00 pm at the Blue House: Kitchen, prepare dinner", java.time.LocalDateTime.now().plusHours(2));
+	longTerm.convert(PlanType.LONG_TERM);
+	agent.getMemoryStream().addAll(List.of(expiredShortTerm, futureShortTerm, longTerm));
+
+	Prompts prompts = Mockito.mock(Prompts.class);
+	UpdatePlans update = new UpdatePlans();
+	UpdateInfo cycle = new UpdateInfo();
+
+	assertDoesNotThrow(() -> update.update(prompts, localWorld, agent, cycle));
+
+	List<Plan> shortPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
+	assertEquals(2, shortPlans.size());
+	assertTrue(shortPlans.stream().anyMatch(plan -> plan.getDescription().equals("8:00 am at the Blue House: Kitchen, clear the cups")));
+	assertTrue(shortPlans.stream().anyMatch(plan -> plan.getDescription().equals("10:30 am at the Blue House: Kitchen, pour fresh tea")));
+	assertEquals(1, agent.getMemoryStream().getPlans(PlanType.LONG_TERM).size());
+	assertEquals("6:00 pm at the Blue House: Kitchen, prepare dinner", agent.getMemoryStream().getPlans(PlanType.LONG_TERM).get(0).getDescription());
+	assertFalse(cycle.isPlansUpdated());
+	Mockito.verify(prompts, Mockito.never()).shouldUpdatePlans(Mockito.any(), Mockito.anyString());
+	Mockito.verify(prompts, Mockito.never()).getPlans(Mockito.any());
+	Mockito.verify(prompts, Mockito.never()).getShortTermPlans(Mockito.any());
+    }
+
+    @Test
     public void test_conversation_update_adds_latest_dialog_to_working_memory_without_spam() throws Exception {
 	World localWorld = new World();
 	Location kitchen = new Location("Blue House: Kitchen");
