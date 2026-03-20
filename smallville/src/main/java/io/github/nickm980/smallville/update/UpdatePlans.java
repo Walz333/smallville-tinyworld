@@ -29,6 +29,7 @@ public class UpdatePlans extends AgentUpdate {
 	boolean hasPlans = !agent.getMemoryStream().getPlans().isEmpty();
 	boolean shouldUpdatePlans = !hasPlans;
 	boolean hasStaleShortTermPlans = hasOnlyExpiredShortTermPlans(agent, now);
+	boolean hasMixedShortTermPlans = hasExpiredAndFutureShortTermPlans(agent, now);
 	boolean plansUpdated = shouldUpdatePlans;
 	String observation = info.getObservation();
 	
@@ -50,6 +51,9 @@ public class UpdatePlans extends AgentUpdate {
 	    agent.getMemoryStream().prunePlans(PlanType.SHORT_TERM);
 	    updatePlans(converter, agent, PlanType.SHORT_TERM);
 	    plansUpdated = true;
+	} else if (hasMixedShortTermPlans) {
+	    LOG.info("[Plans] Pruning expired short term plans from mixed family");
+	    plansUpdated = pruneExpiredShortTermPlans(agent, now);
 	}
 
 	if (agent.getMemoryStream().getPlans(PlanType.LONG_TERM).isEmpty()) {
@@ -70,6 +74,27 @@ public class UpdatePlans extends AgentUpdate {
 	List<Plan> shortTermPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
 	return !shortTermPlans.isEmpty() && shortTermPlans.stream().allMatch(plan -> plan.getTime().isBefore(now));
 	}
+
+    private boolean hasExpiredAndFutureShortTermPlans(Agent agent, LocalDateTime now) {
+	List<Plan> shortTermPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
+	boolean hasExpiredPlans = shortTermPlans.stream().anyMatch(plan -> plan.getTime().isBefore(now));
+	boolean hasFuturePlans = shortTermPlans.stream().anyMatch(plan -> !plan.getTime().isBefore(now));
+	return hasExpiredPlans && hasFuturePlans;
+    }
+
+    private boolean pruneExpiredShortTermPlans(Agent agent, LocalDateTime now) {
+	List<Plan> shortTermPlans = agent.getMemoryStream().getPlans(PlanType.SHORT_TERM);
+	List<Plan> activeShortTermPlans = shortTermPlans.stream()
+	    .filter(plan -> !plan.getTime().isBefore(now))
+	    .collect(Collectors.toList());
+
+	if (activeShortTermPlans.size() == shortTermPlans.size()) {
+	    return false;
+	}
+
+	agent.getMemoryStream().setPlans(activeShortTermPlans, PlanType.SHORT_TERM);
+	return true;
+    }
 
     private void updatePlans(Prompts converter, Agent agent, PlanType type) {
 	List<Plan> plans = type == PlanType.LONG_TERM ? converter.getPlans(agent) : converter.getShortTermPlans(agent);
