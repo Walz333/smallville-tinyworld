@@ -163,7 +163,7 @@ public class ChatService implements Prompts {
 	if (activity == null) {
 	    activity = new CurrentActivity();
 	}
-	LOG.info(activity.getActivity() + activity.getLocation());
+	LOG.info("{} {}", activity.getActivity(), activity.getLocation());
 	activity.setLastActivity(nlp.convertToPastTense(agent.getCurrentActivity()));
 	activity.setActivity(normalizeMealLanguage(activity.getActivity(), SimulationTime.now()));
 
