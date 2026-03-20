@@ -171,3 +171,33 @@ Current unrelated untracked files that remained out of scope:
 
 Recommended next bounded lane:
 - review-only confirmation of whether invalid proposal ID error behavior should be explicitly frozen in one narrow endpoint-contract checkpoint or left implicit under the existing global exception contract, without reopening proposal runtime implementation
+
+## Follow-On Invalid ID Corrective Seam
+
+Follow-on bounded corrective seam completed after the review-only lane found that invalid proposal IDs were not actually normalized by live server wiring.
+
+Reason this seam was required:
+- `approve` and `reject` proposal endpoints passed the proposal ID directly into service lookup
+- missing proposal IDs correctly raised `SmallvilleException("Proposal not found")` in service code
+- shared `ExceptionRoutes` already defined a `SmallvilleException -> 400` contract family
+- but `ExceptionRoutes` was not registered in `SmallvilleServer` startup
+- live invalid proposal review requests therefore returned `500` with body `Server Error` instead of an intentional error contract
+
+Narrow corrective choice taken:
+- endpoint-local normalization for `POST /world/proposals/{id}/approve`
+- endpoint-local normalization for `POST /world/proposals/{id}/reject`
+- global `ExceptionRoutes` registration was not taken in this seam because it would widen unrelated endpoint behavior beyond the proposal invalid-ID boundary
+
+Corrected live behavior now frozen:
+- invalid approve proposal ID returns HTTP `400`
+- invalid reject proposal ID returns HTTP `400`
+- response body is `{"error":"Proposal not found"}`
+
+Direct lock added:
+- `EndpointsTest` now directly verifies invalid approve proposal ID behavior
+- `EndpointsTest` now directly verifies invalid reject proposal ID behavior
+
+This follow-on seam stayed narrow:
+- no proposal-family redesign was opened
+- no global exception-routing migration was opened
+- no unrelated endpoint contracts were changed intentionally
