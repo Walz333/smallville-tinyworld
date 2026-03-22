@@ -19,3 +19,6 @@ out
 pages
 node_modules
 /runs/
+# Local workspace residue
+/tmp/
+/.codex-logs/
