@@ -8,8 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,7 @@ import io.github.nickm980.smallville.llm.ChatGPT;
 import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.memory.Plan;
 import io.github.nickm980.smallville.memory.PlanType;
+import io.github.nickm980.smallville.api.v1.AskShadowBridgeClient;
 import io.github.nickm980.smallville.prompts.PromptRequest;
 import io.github.nickm980.smallville.prompts.Prompts;
 import io.github.nickm980.smallville.prompts.dto.CurrentActivity;
@@ -207,6 +210,54 @@ public class SimulationServiceTest {
 	assertFalse(snapshotAgent.getWorkingMemories().equals(snapshotAgent.getRecentMemories()));
 	assertTrue(snapshotAgent.getRecentMemories().contains("watered the propagation tray"));
 	assertFalse(snapshotAgent.getRecentMemories().contains("Jamie promised tea"));
+    }
+
+    @Test
+    public void test_ask_question_preserves_native_answer_when_shadow_bridge_is_unavailable() {
+	ChatGPT localLlm = Mockito.mock(ChatGPT.class);
+	Mockito.when(localLlm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn("result");
+
+	AskShadowBridgeClient unavailableBridge = new AskShadowBridgeClient() {
+	    @Override
+	    public ShadowAskResult shadowAsk(WorldSnapshotResponse snapshot, String agentName, String question) {
+		return ShadowAskResult.skipped("test-shadow-request", "bridge_unavailable");
+	    }
+	};
+
+	SimulationService localService = new SimulationService(localLlm, new World(), unavailableBridge);
+	WorldSnapshotResponse before = localService.getWorldSnapshot();
+
+	String answer = localService.askQuestion("Jamie", "How is the morning going?");
+
+	WorldSnapshotResponse after = localService.getWorldSnapshot();
+	assertEquals("result", answer);
+	assertEquals(before.getLocations().size(), after.getLocations().size());
+	assertEquals(before.getPendingProposals().size(), after.getPendingProposals().size());
+	assertEquals(before.getTick(), after.getTick());
+	Mockito.verify(localLlm, Mockito.times(1)).sendChat(Mockito.any(), Mockito.anyDouble());
+    }
+
+    @Test
+    public void test_ask_question_skips_disabled_shadow_bridge_without_attempting_call() {
+	ChatGPT localLlm = Mockito.mock(ChatGPT.class);
+	Mockito.when(localLlm.sendChat(Mockito.any(), Mockito.anyDouble())).thenReturn("result");
+
+	AtomicInteger shadowCalls = new AtomicInteger();
+	AskShadowBridgeClient disabledBridge = new AskShadowBridgeClient(false, "http://127.0.0.1:8010/neural/turn", Duration.ofMillis(200), Duration.ofMillis(1200)) {
+	    @Override
+	    public ShadowAskResult shadowAsk(WorldSnapshotResponse snapshot, String agentName, String question) {
+		shadowCalls.incrementAndGet();
+		return super.shadowAsk(snapshot, agentName, question);
+	    }
+	};
+
+	SimulationService localService = new SimulationService(localLlm, new World(), disabledBridge);
+
+	String answer = localService.askQuestion("Jamie", "How is the morning going?");
+
+	assertEquals("result", answer);
+	assertEquals(0, shadowCalls.get());
+	Mockito.verify(localLlm, Mockito.times(1)).sendChat(Mockito.any(), Mockito.anyDouble());
     }
 
     @Test

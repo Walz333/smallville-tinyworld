@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,6 +26,10 @@ import okhttp3.Response;
 public class RuntimeSettingsService {
     private static final Logger LOG = LoggerFactory.getLogger(RuntimeSettingsService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String DEFAULT_ASK_SHADOW_BRIDGE_ENDPOINT = "http://127.0.0.1:8010/neural/turn";
+    private static final int DEFAULT_ASK_SHADOW_BRIDGE_CONNECT_TIMEOUT_MS = 200;
+    private static final int DEFAULT_ASK_SHADOW_BRIDGE_CALL_TIMEOUT_MS = 1200;
+    private static final int MAX_ASK_SHADOW_TIMEOUT_MS = 30000;
 
     private final GeneralConfig config;
     private final Map<String, String> agentModelOverrides = new ConcurrentHashMap<String, String>();
@@ -140,6 +145,39 @@ public class RuntimeSettingsService {
 	return new ArrayList<String>(models);
     }
 
+    public boolean isAskShadowBridgeEnabled() {
+	return config.isAskShadowBridgeEnabled();
+    }
+
+    public String getAskShadowBridgeEndpoint() {
+	String endpoint = config.getAskShadowBridgeEndpoint();
+	if (endpoint == null || endpoint.isBlank()) {
+	    return DEFAULT_ASK_SHADOW_BRIDGE_ENDPOINT;
+	}
+
+	return endpoint.trim();
+    }
+
+    public int getAskShadowBridgeConnectTimeoutMs() {
+	return normalizeTimeout(
+	    config.getAskShadowBridgeConnectTimeoutMs(),
+	    DEFAULT_ASK_SHADOW_BRIDGE_CONNECT_TIMEOUT_MS);
+    }
+
+    public Duration getAskShadowBridgeConnectTimeout() {
+	return Duration.ofMillis(getAskShadowBridgeConnectTimeoutMs());
+    }
+
+    public int getAskShadowBridgeCallTimeoutMs() {
+	return normalizeTimeout(
+	    config.getAskShadowBridgeCallTimeoutMs(),
+	    DEFAULT_ASK_SHADOW_BRIDGE_CALL_TIMEOUT_MS);
+    }
+
+    public Duration getAskShadowBridgeCallTimeout() {
+	return Duration.ofMillis(getAskShadowBridgeCallTimeoutMs());
+    }
+
     private String determineProviderMode(String apiPath) {
 	if (isLoopbackApiPath(apiPath)) {
 	    return "local-ollama";
@@ -192,5 +230,13 @@ public class RuntimeSettingsService {
 	    LOG.warn("Could not derive Ollama tags URL from {}", apiPath, e);
 	    return null;
 	}
+    }
+
+    private int normalizeTimeout(int configuredValue, int defaultValue) {
+	if (configuredValue <= 0) {
+	    return defaultValue;
+	}
+
+	return Math.min(configuredValue, MAX_ASK_SHADOW_TIMEOUT_MS);
     }
 }

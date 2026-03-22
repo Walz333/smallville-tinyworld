@@ -251,10 +251,15 @@ public class EndpointsTest {
 	JavalinTest.test(app, (server, client) -> {
 	    Response response = client.get("/models");
 	    JSONObject body = new JSONObject(response.body().string());
+	    JSONObject askShadowBridge = body.getJSONObject("askShadowBridge");
 
 	    assertEquals(response.code(), 200);
 	    assertNotNull(body.get("providerMode"));
 	    assertNotNull(body.get("availableModels"));
+	    assertFalse(askShadowBridge.getBoolean("enabled"));
+	    assertEquals("http://127.0.0.1:8010/neural/turn", askShadowBridge.getString("endpoint"));
+	    assertEquals(200, askShadowBridge.getInt("connectTimeoutMs"));
+	    assertEquals(1200, askShadowBridge.getInt("callTimeoutMs"));
 	});
     }
 

@@ -88,6 +88,7 @@ public class SimulationService {
     private final UpdateService prompts;
     private final World world;
     private final RuntimeSettingsService runtimeSettings;
+    private final AskShadowBridgeClient askShadowBridgeClient;
     private final List<WorldSnapshotResponse.ActionLogResponse> actionLog;
     private final List<WorldProposal> proposals;
     private final Map<UUID, MemoryStream> memories;
@@ -95,13 +96,24 @@ public class SimulationService {
     private SimulationFile simulationSeed;
 
     public SimulationService(LLM llm, World world) {
+	this(llm, world, null, new RuntimeSettingsService(SmallvilleConfig.getConfig()));
+    }
+
+    public SimulationService(LLM llm, World world, AskShadowBridgeClient askShadowBridgeClient) {
+	this(llm, world, askShadowBridgeClient, new RuntimeSettingsService(SmallvilleConfig.getConfig()));
+    }
+
+    private SimulationService(LLM llm, World world, AskShadowBridgeClient askShadowBridgeClient, RuntimeSettingsService runtimeSettings) {
 	this.world = world;
 	this.mapper = new ModelMapper();
 	this.actionLog = new ArrayList<WorldSnapshotResponse.ActionLogResponse>();
 	this.proposals = new ArrayList<WorldProposal>();
 	this.memories = new HashMap<UUID, MemoryStream>();
 	this.progress = 0;
-	this.runtimeSettings = new RuntimeSettingsService(SmallvilleConfig.getConfig());
+	this.runtimeSettings = runtimeSettings;
+	this.askShadowBridgeClient = askShadowBridgeClient == null
+	    ? AskShadowBridgeClient.fromRuntimeSettings(this.runtimeSettings)
+	    : askShadowBridgeClient;
 	this.simulationSeed = loadSimulationSeedDefinition();
 	this.prompts = new UpdateService(llm, world, simulationSeed, runtimeSettings);
 
@@ -220,6 +232,16 @@ public class SimulationService {
 	response.setDefaultModel(runtimeSettings.getDefaultModel());
 	response.setAvailableModels(runtimeSettings.discoverModels());
 	response.setAgentModelOverrides(runtimeSettings.getAgentModelOverrides());
+	response.setAskShadowBridge(buildAskShadowBridgeResponse());
+	return response;
+    }
+
+    private ModelsResponse.AskShadowBridgeResponse buildAskShadowBridgeResponse() {
+	ModelsResponse.AskShadowBridgeResponse response = new ModelsResponse.AskShadowBridgeResponse();
+	response.setEnabled(runtimeSettings.isAskShadowBridgeEnabled());
+	response.setEndpoint(runtimeSettings.getAskShadowBridgeEndpoint());
+	response.setConnectTimeoutMs(runtimeSettings.getAskShadowBridgeConnectTimeoutMs());
+	response.setCallTimeoutMs(runtimeSettings.getAskShadowBridgeCallTimeoutMs());
 	return response;
     }
 
@@ -433,7 +455,35 @@ public class SimulationService {
 
     public String askQuestion(String name, String question) {
 	Agent agent = world.getAgent(name).orElseThrow(() -> new AgentNotFoundException(name));
-	return prompts.ask(agent, question);
+	String answer = prompts.ask(agent, question);
+	shadowAskBridge(name, question);
+	return answer;
+    }
+
+    private void shadowAskBridge(String agentName, String question) {
+	if (!askShadowBridgeClient.isEnabled()) {
+	    LOG.info("Shadow ask bridge skipped agent={} reason=disabled", agentName);
+	    return;
+	}
+
+	try {
+	    AskShadowBridgeClient.ShadowAskResult result = askShadowBridgeClient.shadowAsk(getWorldSnapshot(), agentName, question);
+	    if (result.isAccepted()) {
+		LOG.info(
+		    "Shadow ask bridge accepted requestId={} agent={} adapter={} model={} auditRef={} latencyMs={}",
+		    result.getRequestId(),
+		    agentName,
+		    result.getSelectedAdapter(),
+		    result.getSelectedModel(),
+		    result.getAuditRef(),
+		    result.getLatencyMs());
+		return;
+	    }
+
+	    LOG.info("Shadow ask bridge skipped requestId={} agent={} reason={}", result.getRequestId(), agentName, result.getReason());
+	} catch (RuntimeException e) {
+	    LOG.warn("Shadow ask bridge failed unexpectedly for {}", agentName, e);
+	}
     }
 
     public void updateState() throws SmallvilleException {

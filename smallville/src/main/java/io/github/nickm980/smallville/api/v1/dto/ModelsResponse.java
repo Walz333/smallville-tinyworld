@@ -10,6 +10,7 @@ public class ModelsResponse {
     private String defaultModel;
     private List<String> availableModels = new ArrayList<String>();
     private Map<String, String> agentModelOverrides = new TreeMap<String, String>();
+    private AskShadowBridgeResponse askShadowBridge = new AskShadowBridgeResponse();
 
     public String getProviderMode() {
 	return providerMode;
@@ -41,5 +42,52 @@ public class ModelsResponse {
 
     public void setAgentModelOverrides(Map<String, String> agentModelOverrides) {
 	this.agentModelOverrides = agentModelOverrides;
+    }
+
+    public AskShadowBridgeResponse getAskShadowBridge() {
+	return askShadowBridge;
+    }
+
+    public void setAskShadowBridge(AskShadowBridgeResponse askShadowBridge) {
+	this.askShadowBridge = askShadowBridge == null ? new AskShadowBridgeResponse() : askShadowBridge;
+    }
+
+    public static class AskShadowBridgeResponse {
+	private boolean enabled;
+	private String endpoint;
+	private int connectTimeoutMs;
+	private int callTimeoutMs;
+
+	public boolean isEnabled() {
+	    return enabled;
+	}
+
+	public void setEnabled(boolean enabled) {
+	    this.enabled = enabled;
+	}
+
+	public String getEndpoint() {
+	    return endpoint;
+	}
+
+	public void setEndpoint(String endpoint) {
+	    this.endpoint = endpoint;
+	}
+
+	public int getConnectTimeoutMs() {
+	    return connectTimeoutMs;
+	}
+
+	public void setConnectTimeoutMs(int connectTimeoutMs) {
+	    this.connectTimeoutMs = connectTimeoutMs;
+	}
+
+	public int getCallTimeoutMs() {
+	    return callTimeoutMs;
+	}
+
+	public void setCallTimeoutMs(int callTimeoutMs) {
+	    this.callTimeoutMs = callTimeoutMs;
+	}
     }
 }

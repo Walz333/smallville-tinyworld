@@ -14,3 +14,8 @@ reflectionCutoff: 50
 simulationFile: false
 # How many times the LLM client should attempt to send a prompt before aborting
 maxRetries: 2
+# Ask-shadow bridge is opt-in. When disabled, /agents/{name}/ask skips the localhost bridge seam.
+askShadowBridgeEnabled: false
+askShadowBridgeEndpoint: http://127.0.0.1:8010/neural/turn
+askShadowBridgeConnectTimeoutMs: 200
+askShadowBridgeCallTimeoutMs: 1200
