@@ -9,10 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.log4j.AppenderSkeleton;
+import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggingEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -843,11 +847,168 @@ public class SimulationServiceTest {
 
 	createProposalAgent("Rowan", true);
 
-	assertDoesNotThrow(() -> service.updateState());
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
 
-	assertEquals(0, service.getWorldProposals().stream()
-	    .filter(proposal -> proposal.getAgent().equals("Rowan"))
-	    .count());
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(0, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[dropped_proposal] detail=[missing_reason]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
+    }
+
+    @Test
+    public void test_update_state_logs_explicit_no_proposal_attempt() {
+	stubRuntimeProposalResponse("Answer: No");
+	createProposalAgent("Rowan", true);
+
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
+
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(0, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[no_proposal_attempt] detail=[explicit_no]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
+    }
+
+    @Test
+    public void test_update_state_logs_parser_rejected_proposal_attempt_when_no_fields_are_parseable() {
+	stubRuntimeProposalResponse("I might tidy the kitchen later.");
+	createProposalAgent("Rowan", true);
+
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
+
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(0, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[parser_rejected] detail=[parser_rejected]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
+    }
+
+    @Test
+    public void test_update_state_normalizes_answer_line_type_into_queued_proposal() {
+	stubRuntimeProposalResponse(
+	    "Answer: add_location\n"
+		+ "ParentLocation: Green House\n"
+		+ "Name: Compost Bin\n"
+		+ "ProposedState: partially filled with finished compost\n"
+		+ "Reason: to reduce waste and create a steady supply of nutrient-rich compost for future propagation rounds.");
+	createProposalAgent("Rowan", true);
+
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
+
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(1, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[queued_proposal] detail=[pending_review; normalized_type_from_answer]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
+    }
+
+    @Test
+    public void test_update_state_normalizes_missing_answer_into_yes_for_grounded_type() {
+	stubRuntimeProposalResponse(
+	    "Type: add_object\n"
+		+ "ParentLocation: Blue House: Kitchen\n"
+		+ "Name: Tea Tray Shelf\n"
+		+ "ProposedState: organized\n"
+		+ "Reason: To keep the tea setup tidy during the morning round.");
+	createProposalAgent("Rowan", true);
+
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
+
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(1, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[queued_proposal] detail=[pending_review; normalized_yes_from_missing_answer]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
+    }
+
+    @Test
+    public void test_update_state_keeps_invalid_answer_family_as_malformed_response() {
+	stubRuntimeProposalResponse(
+	    "Answer: Maybe\n"
+		+ "Type: add_location\n"
+		+ "ParentLocation: Green House\n"
+		+ "Name: Compost Bin\n"
+		+ "ProposedState: partially filled with finished compost\n"
+		+ "Reason: to reduce waste and create a steady supply of nutrient-rich compost for future propagation rounds.");
+	createProposalAgent("Rowan", true);
+
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
+
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(0, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[malformed_response] detail=[invalid_answer]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
+    }
+
+    @Test
+    public void test_update_state_logs_dropped_proposal_when_validation_fails_after_parse() {
+	stubRuntimeProposalResponse(
+	    "Answer: Yes\n"
+		+ "Type: add_location\n"
+		+ "ParentLocation: Green House: Water Barrel\n"
+		+ "Name: Rain Barrel Alcove\n"
+		+ "ProposedState: ready\n"
+		+ "Reason: To keep spare barrels together.");
+	createProposalAgent("Rowan", true);
+
+	Logger logger = Logger.getLogger(SimulationService.class);
+	CapturingAppender appender = new CapturingAppender();
+	logger.addAppender(appender);
+
+	try {
+	    assertDoesNotThrow(() -> service.updateState());
+
+	    assertEquals(0, service.getWorldProposals().stream()
+		.filter(proposal -> proposal.getAgent().equals("Rowan"))
+		.count());
+	    assertTrue(appender.messages.stream().anyMatch(message -> message.contains("[ProposalReview] agent=[Rowan] outcome=[dropped_proposal] detail=[invalid_add_location_parent]")));
+	} finally {
+	    logger.removeAppender(appender);
+	}
     }
 
     private void createLocation(String name) {
@@ -860,7 +1021,7 @@ public class SimulationServiceTest {
 	service.createLocation(request);
     }
 
-	private void createProposalAgent(String name, boolean canProposeWorldChanges) {
+    private void createProposalAgent(String name, boolean canProposeWorldChanges) {
 	CreateAgentRequest createAgent = new CreateAgentRequest();
 	createAgent.setActivity("organizing the tea things");
 	createAgent.setLocation("Blue House: Kitchen");
@@ -940,5 +1101,23 @@ public class SimulationServiceTest {
 	List<WorldProposal> proposals = (List<WorldProposal>) field.get(service);
 	assertNotNull(proposals);
 	proposals.add(proposal);
+    }
+
+    private static class CapturingAppender extends AppenderSkeleton {
+	private final List<String> messages = new ArrayList<String>();
+
+	@Override
+	protected void append(LoggingEvent event) {
+	    messages.add(String.valueOf(event.getRenderedMessage()));
+	}
+
+	@Override
+	public void close() {
+	}
+
+	@Override
+	public boolean requiresLayout() {
+	    return false;
+	}
     }
 }

@@ -39,7 +39,9 @@ import io.github.nickm980.smallville.runtime.RuntimeSettingsService;
 import io.github.nickm980.smallville.update.UpdateService;
 
 public class ChatService implements Prompts {
+    private static final Set<String> ALLOWED_PROPOSAL_TYPES = Set.of("add_location", "add_object", "change_state");
     private static final Pattern TIME_PATTERN = Pattern.compile("\\b\\d{1,2}:\\d{2}\\s*[APap][Mm]\\b");
+    private static final Pattern TIME_LINE_PATTERN = Pattern.compile("^\\d{1,2}:\\d{2}\\s*[APap][Mm]\\b");
     private static final Pattern PLAN_PREFIX_PATTERN = Pattern.compile("^(?:[-*•]\\s+|\\.\\s+|\\d+[.)]\\s+)+");
     private static final Pattern TIME_ONLY_PATTERN = Pattern.compile("^\\d{1,2}:\\d{2}\\s*[APap][Mm]\\.?$");
 
@@ -130,7 +132,7 @@ public class ChatService implements Prompts {
 	    .withWorld(world, simulationSeed)
 	    , SmallvilleConfig.getPrompts().getPlans().getLongTerm());
 
-	String response = chat.sendChat(prompt, .6);
+	String response = chat.sendChat(prompt, .4);
 	return parsePlans(response);
     }
 
@@ -143,7 +145,7 @@ public class ChatService implements Prompts {
 	    .withWorld(world, simulationSeed)
 	    , SmallvilleConfig.getPrompts().getPlans().getShortTerm());
 
-	String response = chat.sendChat(prompt, .7);
+	String response = chat.sendChat(prompt, .4);
 
 	return parsePlans(response);
     }
@@ -239,6 +241,16 @@ public class ChatService implements Prompts {
 		continue;
 	    }
 
+	    if (isIgnorablePlanWrapperLine(line)) {
+		continue;
+	    }
+
+	    if (!segments.isEmpty() && canMergePlanContinuation(segments.get(segments.size() - 1), line)) {
+		int lastIndex = segments.size() - 1;
+		segments.set(lastIndex, mergePlanContinuation(segments.get(lastIndex), line));
+		continue;
+	    }
+
 	    segments.add(line);
 	}
 
@@ -254,6 +266,73 @@ public class ChatService implements Prompts {
 	normalized = PLAN_PREFIX_PATTERN.matcher(normalized).replaceFirst("");
 	normalized = normalized.replaceFirst("^[;,-]+\\s*", "");
 	return normalized.trim();
+    }
+
+    private boolean startsWithTime(String line) {
+	return line != null && TIME_LINE_PATTERN.matcher(line.trim()).find();
+    }
+
+    private boolean canMergePlanContinuation(String timedSegment, String continuation) {
+	if (continuation == null || continuation.isBlank()) {
+	    return false;
+	}
+
+	if (!startsWithTime(timedSegment) || startsWithTime(continuation)) {
+	    return false;
+	}
+
+	return looksLikeIncompleteTimedPlan(timedSegment);
+    }
+
+    private String mergePlanContinuation(String timedSegment, String continuation) {
+	if (timedSegment == null || timedSegment.isBlank()) {
+	    return continuation;
+	}
+
+	if (continuation == null || continuation.isBlank()) {
+	    return timedSegment;
+	}
+
+	String separator = timedSegment.endsWith(",") || timedSegment.endsWith(":") || timedSegment.endsWith(";") ? " " : ", ";
+	return timedSegment + separator + continuation.trim();
+    }
+
+    private boolean looksLikeIncompleteTimedPlan(String line) {
+	String normalized = normalizeBlank(line);
+	if (normalized == null) {
+	    return false;
+	}
+
+	Matcher matcher = TIME_PATTERN.matcher(normalized);
+	if (!matcher.find()) {
+	    return false;
+	}
+
+	String remainder = normalized.substring(matcher.end()).trim();
+	if (remainder.isBlank() || remainder.contains(",")) {
+	    return false;
+	}
+
+	if (remainder.toLowerCase(Locale.ENGLISH).startsWith("at ")) {
+	    return true;
+	}
+
+	return remainder.split("\\s+").length <= 3;
+    }
+
+    private boolean isIgnorablePlanWrapperLine(String line) {
+	String normalized = normalizeBlank(line);
+	if (normalized == null) {
+	    return true;
+	}
+
+	String lower = normalized.toLowerCase(Locale.ENGLISH);
+	return lower.startsWith("here is ") && lower.contains("plan")
+	    || lower.startsWith("plan today in broad strokes")
+	    || lower.startsWith("i'd be happy to help ")
+	    || lower.startsWith("i would be happy to help ")
+	    || lower.contains("i'll start the next hour from then")
+	    || lower.contains("i will start the next hour from then");
     }
 
     private LocalDateTime parseTime(String line) throws DateTimeParseException {
@@ -425,7 +504,7 @@ public class ChatService implements Prompts {
 	    .withLocations(world.getLocations())
 	    , SmallvilleConfig.getPrompts().getWorld().getProposal());
 
-	String response = chat.sendChat(request, .4);
+	String response = chat.sendChat(request, .2);
 	WorldProposalCandidate candidate = parseWorldProposal(response);
 	if (candidate == null) {
 	    return null;
@@ -457,7 +536,78 @@ public class ChatService implements Prompts {
 	    }
 	});
 
-	return candidate.getType() == null && candidate.getName() == null && candidate.getReason() == null ? null : candidate;
+	return candidate.getAnswer() == null
+	    && candidate.getType() == null
+	    && candidate.getParentLocation() == null
+	    && candidate.getName() == null
+	    && candidate.getProposedState() == null
+	    && candidate.getReason() == null ? null : normalizeWorldProposalCandidate(candidate);
+    }
+
+    private WorldProposalCandidate normalizeWorldProposalCandidate(WorldProposalCandidate candidate) {
+	String normalizedType = normalizeProposalTypeToken(candidate.getType());
+	String normalizedAnswer = normalizeProposalAnswerToken(candidate.getAnswer());
+	String answerAsType = normalizeProposalTypeToken(candidate.getAnswer());
+
+	if (normalizedType == null && answerAsType != null && ALLOWED_PROPOSAL_TYPES.contains(answerAsType)) {
+	    candidate.setType(answerAsType);
+	    candidate.setAnswer("Yes");
+	    candidate.setNormalizationDetail("normalized_type_from_answer");
+	    normalizedType = answerAsType;
+	    normalizedAnswer = "yes";
+	}
+
+	if (normalizeBlank(candidate.getAnswer()) == null && normalizedType != null && ALLOWED_PROPOSAL_TYPES.contains(normalizedType)) {
+	    candidate.setAnswer("Yes");
+	    if (normalizeBlank(candidate.getNormalizationDetail()) == null) {
+		candidate.setNormalizationDetail("normalized_yes_from_missing_answer");
+	    }
+	    normalizedAnswer = "yes";
+	}
+
+	if (normalizedType != null) {
+	    candidate.setType(normalizedType);
+	}
+
+	if (normalizedAnswer != null) {
+	    candidate.setAnswer("no".equals(normalizedAnswer) ? "No" : "Yes");
+	}
+
+	return candidate;
+    }
+
+    private String normalizeProposalTypeToken(String value) {
+	String normalized = normalizeBlank(value);
+	if (normalized == null) {
+	    return null;
+	}
+
+	return normalized.toLowerCase(Locale.ENGLISH).replace(' ', '_');
+    }
+
+    private String normalizeProposalAnswerToken(String value) {
+	String normalized = normalizeBlank(value);
+	if (normalized == null) {
+	    return null;
+	}
+
+	normalized = normalized.toLowerCase(Locale.ENGLISH).replace(".", "");
+	if ("yes".equals(normalized) || "y".equals(normalized)) {
+	    return "yes";
+	}
+	if ("no".equals(normalized) || "n".equals(normalized)) {
+	    return "no";
+	}
+	return null;
+    }
+
+    private String normalizeBlank(String value) {
+	if (value == null) {
+	    return null;
+	}
+
+	String normalized = value.trim();
+	return normalized.isBlank() ? null : normalized;
     }
 
     private String normalizeDuplicateActivityLocation(String activityText, String locationText) {

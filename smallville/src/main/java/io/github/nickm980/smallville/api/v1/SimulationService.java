@@ -82,6 +82,7 @@ public class SimulationService {
 	"racks"
     );
     private static final Set<String> PENDING_PROPOSAL_STATUSES = Set.of("pending", "approved");
+    private static final String PROPOSAL_REVIEW_PREFIX = "[ProposalReview]";
 
     private final Logger LOG = LoggerFactory.getLogger(SimulationService.class);
     private final ModelMapper mapper;
@@ -931,29 +932,69 @@ public class SimulationService {
 	}
 
 	WorldProposalCandidate candidate = prompts.createWorldProposal(agent);
-	if (!shouldQueueProposal(candidate)) {
+	String preQueueDetail = getProposalPreQueueDetail(candidate);
+	if (preQueueDetail != null) {
+	    String reviewDetail = buildProposalReviewDetail(preQueueDetail, candidate);
+	    if ("explicit_no".equals(preQueueDetail)) {
+		logProposalReview(agent, "no_proposal_attempt", reviewDetail, candidate);
+	    } else if ("parser_rejected".equals(preQueueDetail)) {
+		logProposalReview(agent, "parser_rejected", reviewDetail, candidate);
+	    } else {
+		logProposalReview(agent, "malformed_response", reviewDetail, candidate);
+	    }
 	    return;
 	}
 
 	WorldProposal proposal = toProposal(agent, candidate);
-	if (proposal == null || !isProposalValid(proposal)) {
+	if (proposal == null) {
+	    logProposalReview(agent, "dropped_proposal", buildProposalReviewDetail("to_proposal_returned_null", candidate), candidate);
+	    return;
+	}
+
+	String validationFailure = getProposalValidationFailure(proposal);
+	if (validationFailure != null) {
+	    logProposalReview(agent, "dropped_proposal", buildProposalReviewDetail(validationFailure, candidate), candidate);
 	    return;
 	}
 
 	proposals.add(proposal);
 	recordAction(agent.getFullName(), "proposal", "Proposed " + describeProposal(proposal), proposal.getParentLocation(), buildProposalLocation(proposal));
+	logProposalReview(agent, "queued_proposal", buildProposalReviewDetail("pending_review", candidate), candidate);
     }
 
-    private boolean shouldQueueProposal(WorldProposalCandidate candidate) {
+    private String getProposalPreQueueDetail(WorldProposalCandidate candidate) {
 	if (candidate == null) {
-	    return false;
+	    return "parser_rejected";
 	}
 
-	if (candidate.getAnswer() != null && candidate.getAnswer().toLowerCase(Locale.ENGLISH).contains("no")) {
-	    return false;
+	String normalizedAnswer = normalizeProposalAnswer(candidate.getAnswer());
+	if ("no".equals(normalizedAnswer)) {
+	    return "explicit_no";
 	}
 
-	return candidate.getType() != null && !candidate.getType().isBlank();
+	if (normalizedAnswer == null) {
+	    return normalizeBlank(candidate.getAnswer()) == null ? "missing_answer" : "invalid_answer";
+	}
+
+	if (candidate.getType() == null || candidate.getType().isBlank()) {
+	    return "missing_type";
+	}
+
+	return null;
+    }
+
+    private String buildProposalReviewDetail(String detail, WorldProposalCandidate candidate) {
+	String normalizationDetail = normalizeBlank(candidate == null ? null : candidate.getNormalizationDetail());
+	if (normalizationDetail == null) {
+	    return detail;
+	}
+
+	String baseDetail = normalizeBlank(detail);
+	if (baseDetail == null) {
+	    return normalizationDetail;
+	}
+
+	return baseDetail + "; " + normalizationDetail;
     }
 
     private WorldProposal toProposal(Agent agent, WorldProposalCandidate candidate) {
@@ -971,41 +1012,48 @@ public class SimulationService {
     }
 
     private boolean isProposalValid(WorldProposal proposal) {
+	return getProposalValidationFailure(proposal) == null;
+    }
+
+    private String getProposalValidationFailure(WorldProposal proposal) {
 	if (proposal.getType() == null || !ALLOWED_PROPOSAL_TYPES.contains(proposal.getType())) {
-	    return false;
+	    return "unsupported_type";
 	}
 
 	if (proposal.getReason() == null || proposal.getReason().isBlank()) {
-	    return false;
+	    return "missing_reason";
 	}
 
 	if ("change_state".equals(proposal.getType())) {
 	    if (proposal.getProposedState() == null || proposal.getProposedState().isBlank()) {
-		return false;
+		return "missing_proposed_state";
 	    }
 	    String targetLocation = buildProposalLocation(proposal);
-	    return targetLocation != null && world.resolveLocation(targetLocation).isPresent();
+	    if (targetLocation == null || world.resolveLocation(targetLocation).isEmpty()) {
+		return "unknown_change_state_target";
+	    }
+	    return null;
 	}
 
 	if (proposal.getName() == null || proposal.getName().isBlank()) {
-	    return false;
+	    return "missing_name";
 	}
 
 	if ("add_object".equals(proposal.getType()) || (proposal.getParentLocation() != null && !proposal.getParentLocation().isBlank())) {
 	    if (proposal.getParentLocation() == null || proposal.getParentLocation().isBlank()) {
-		return false;
+		return "missing_parent_location";
 	    }
 	    if (world.resolveLocation(proposal.getParentLocation()).isEmpty()) {
-		return false;
+		return "unknown_parent_location";
 	    }
 	    if ("add_location".equals(proposal.getType()) && !isValidAddLocationParent(proposal.getParentLocation())) {
-		return false;
+		return "invalid_add_location_parent";
 	    }
 	}
 
 	String targetLocation = buildProposalLocation(proposal);
 	if (targetLocation == null || targetLocation.isBlank()) {
-	    return false;
+	    return "missing_target_location";
 	}
 
 	boolean duplicatePending = proposals
@@ -1014,10 +1062,14 @@ public class SimulationService {
 	    .anyMatch(existing -> normalizeText(existing.getType()).equals(normalizeText(proposal.getType()))
 		&& normalizeText(buildProposalLocation(existing)).equals(normalizeText(targetLocation)));
 	if (duplicatePending) {
-	    return false;
+	    return "duplicate_pending_target";
 	}
 
-	return world.getLocation(targetLocation).isEmpty();
+	if (world.getLocation(targetLocation).isPresent()) {
+	    return "target_location_already_exists";
+	}
+
+	return null;
     }
 
     private boolean isValidAddLocationParent(String parentLocationName) {
@@ -1172,6 +1224,22 @@ public class SimulationService {
 	return normalized.toLowerCase(Locale.ENGLISH).replace(' ', '_');
     }
 
+    private String normalizeProposalAnswer(String answer) {
+	String normalized = normalizeBlank(answer);
+	if (normalized == null) {
+	    return null;
+	}
+
+	normalized = normalized.toLowerCase(Locale.ENGLISH).replace(".", "");
+	if ("yes".equals(normalized) || "y".equals(normalized)) {
+	    return "yes";
+	}
+	if ("no".equals(normalized) || "n".equals(normalized)) {
+	    return "no";
+	}
+	return null;
+    }
+
     private String normalizeSocialPreference(String preference) {
 	String normalized = normalizeBlank(preference);
 	if (normalized == null) {
@@ -1205,6 +1273,35 @@ public class SimulationService {
 
 	String normalized = value.trim();
 	return normalized.isBlank() ? null : normalized;
+    }
+
+    private void logProposalReview(Agent agent, String outcome, String detail, WorldProposalCandidate candidate) {
+	LOG.info(
+	    "{} agent=[{}] outcome=[{}] detail=[{}] answer=[{}] type=[{}] parentLocation=[{}] name=[{}] proposedState=[{}] reason=[{}]",
+	    PROPOSAL_REVIEW_PREFIX,
+	    sanitizeProposalDiagnosticValue(agent == null ? null : agent.getFullName()),
+	    sanitizeProposalDiagnosticValue(outcome),
+	    sanitizeProposalDiagnosticValue(detail),
+	    sanitizeProposalDiagnosticValue(candidate == null ? null : candidate.getAnswer()),
+	    sanitizeProposalDiagnosticValue(candidate == null ? null : candidate.getType()),
+	    sanitizeProposalDiagnosticValue(candidate == null ? null : candidate.getParentLocation()),
+	    sanitizeProposalDiagnosticValue(candidate == null ? null : candidate.getName()),
+	    sanitizeProposalDiagnosticValue(candidate == null ? null : candidate.getProposedState()),
+	    sanitizeProposalDiagnosticValue(candidate == null ? null : candidate.getReason()));
+    }
+
+    private String sanitizeProposalDiagnosticValue(String value) {
+	String normalized = normalizeBlank(value);
+	if (normalized == null) {
+	    return "";
+	}
+
+	return normalized
+	    .replace("[", "(")
+	    .replace("]", ")")
+	    .replace("\r", " ")
+	    .replace("\n", " | ")
+	    .trim();
     }
 
     private String normalizeText(String value) {

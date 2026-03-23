@@ -7,6 +7,7 @@ public class WorldProposalCandidate {
     private String name;
     private String proposedState;
     private String reason;
+    private String normalizationDetail;
 
     public String getAnswer() {
 	return answer;
@@ -54,5 +55,13 @@ public class WorldProposalCandidate {
 
     public void setReason(String reason) {
 	this.reason = reason;
+    }
+
+    public String getNormalizationDetail() {
+	return normalizationDetail;
+    }
+
+    public void setNormalizationDetail(String normalizationDetail) {
+	this.normalizationDetail = normalizationDetail;
     }
 }
