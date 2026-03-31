@@ -1,0 +1,18 @@
+{
+  "agentName" : "Alex",
+  "totalEvents" : 2,
+  "hotCount" : 20,
+  "archivedCount" : 9,
+  "dreamPackCount" : 1,
+  "lastDreamTick" : 11,
+  "lastRecallTick" : 0,
+  "lastAffect" : {
+    "moodLabel" : "distressed",
+    "valence" : -0.89,
+    "activation" : 0.05500000000000001,
+    "socialDrive" : 0.0,
+    "focusTarget" : "reviewing tray notes and plant condition inside the sheltered growing space",
+    "drivers" : [ "reviewing tray notes and plant condition inside the sheltered growing space", "review plan sheets and tray maps for the evening", "Review plan sheets and tray maps for the evening" ],
+    "updatedAtTick" : 11
+  }
+}

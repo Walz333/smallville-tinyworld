@@ -27,7 +27,9 @@ import io.github.nickm980.smallville.api.v1.dto.CreateAgentRequest;
 import io.github.nickm980.smallville.api.v1.dto.CreateLocationRequest;
 import io.github.nickm980.smallville.api.v1.dto.CreateMemoryRequest;
 import io.github.nickm980.smallville.api.v1.dto.ImportAgentsRequest;
+import io.github.nickm980.smallville.api.v1.dto.AgentMemoryLedgerResponse;
 import io.github.nickm980.smallville.api.v1.dto.ImportAgentsResponse;
+import io.github.nickm980.smallville.api.v1.dto.LedgerExportResponse;
 import io.github.nickm980.smallville.api.v1.dto.LocationStateResponse;
 import io.github.nickm980.smallville.api.v1.dto.MemoryResponse;
 import io.github.nickm980.smallville.api.v1.dto.ModelMapper;
@@ -57,6 +59,13 @@ import io.github.nickm980.smallville.memory.MemoryStream;
 import io.github.nickm980.smallville.memory.Observation;
 import io.github.nickm980.smallville.memory.Plan;
 import io.github.nickm980.smallville.memory.PlanType;
+import io.github.nickm980.smallville.memory.dreaming.DreamingService;
+import io.github.nickm980.smallville.memory.dreaming.PonderService;
+import io.github.nickm980.smallville.memory.dreaming.RecallService;
+import io.github.nickm980.smallville.memory.ledger.DreamPack;
+import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
+import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
+import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
 import io.github.nickm980.smallville.prompts.dto.WorldProposalCandidate;
 import io.github.nickm980.smallville.runtime.RuntimeSettingsService;
 import io.github.nickm980.smallville.update.UpdateService;
@@ -95,6 +104,10 @@ public class SimulationService {
     private final Map<UUID, MemoryStream> memories;
     private int progress;
     private SimulationFile simulationSeed;
+    private final MemoryJournalWriter journalWriter;
+    private final DreamingService dreamingService;
+    private final PonderService ponderService;
+    private final RecallService recallService;
 
     public SimulationService(LLM llm, World world) {
 	this(llm, world, null, new RuntimeSettingsService(SmallvilleConfig.getConfig()));
@@ -115,12 +128,18 @@ public class SimulationService {
 	this.askShadowBridgeClient = askShadowBridgeClient == null
 	    ? AskShadowBridgeClient.fromRuntimeSettings(this.runtimeSettings)
 	    : askShadowBridgeClient;
+	this.journalWriter = new MemoryJournalWriter(".smallville-memory");
+	this.dreamingService = new DreamingService(journalWriter);
+	this.ponderService = new PonderService(journalWriter);
+	this.recallService = new RecallService(journalWriter);
 	this.simulationSeed = loadSimulationSeedDefinition();
 	this.prompts = new UpdateService(llm, world, simulationSeed, runtimeSettings);
 
 	if (simulationSeed != null) {
 	    loadSimulationSeed();
 	}
+
+	restoreMemoryLedgers();
     }
 
     private SimulationFile loadSimulationSeedDefinition() {
@@ -150,6 +169,44 @@ public class SimulationService {
 	}
 
 	LOG.info("Loaded simulation seed with {} locations and {} agents.", world.getLocations().size(), world.getAgents().size());
+    }
+
+    private void restoreMemoryLedgers() {
+	for (Agent agent : world.getAgents()) {
+	    String name = agent.getFullName();
+	    if (!journalWriter.hasPersistedData(name)) {
+		continue;
+	    }
+
+	    MemoryLedgerIndex index = journalWriter.loadOrCreateIndex(name);
+
+	    // Restore affect state from last dream cycle
+	    if (index.getLastAffect() != null) {
+		agent.setAffect(index.getLastAffect());
+	    }
+
+	    // Restore hot memories as observations into memory stream
+	    List<MemoryLedgerEntry> recentEntries = journalWriter.loadRecentEntriesByType(name, "observation", index.getHotCount() > 0 ? index.getHotCount() : 20);
+	    for (MemoryLedgerEntry entry : recentEntries) {
+		if (entry.getDescription() != null && !entry.getDescription().isBlank()) {
+		    agent.getMemoryStream().add(new Observation(entry.getDescription()));
+		}
+	    }
+
+	    // Restore last dream tick so the dreaming service knows when the last cycle ran
+	    if (index.getLastDreamTick() > 0) {
+		dreamingService.restoreLastDreamTick(name, index.getLastDreamTick());
+	    }
+
+	    // Restore last ponder tick so the ponder service knows when the last ponder ran
+	    if (index.getLastPonderTick() > 0) {
+		ponderService.restoreLastPonderTick(name, index.getLastPonderTick());
+	    }
+
+	    LOG.info("Restored memory ledger for {}: {} hot memories, {} dream packs, affect={}",
+		name, index.getHotCount(), index.getDreamPackCount(),
+		index.getLastAffect() != null ? index.getLastAffect().getMoodLabel() : "neutral");
+	}
     }
 
     private void createSeedLocation(String parentPath, LocationSeed seed) {
@@ -505,6 +562,41 @@ public class SimulationService {
 	    maybeStartAmbientConversation(agent, oldActivity, oldLocation, conversationsStarted);
 	    maybeQueueWorldProposal(agent);
 	}
+
+	// Run dream cycle for eligible agents after all updates
+	Set<String> dreamedAgents = runDreamCycles();
+
+	// Run ponder for eligible agents that did not dream this tick
+	runPonderCycles(dreamedAgents);
+    }
+
+    private Set<String> runDreamCycles() {
+	Set<String> dreamed = new HashSet<>();
+	SimulationFile.MemorySeed memoryConfig = simulationSeed != null ? simulationSeed.getMemory() : null;
+	for (Agent agent : world.getAgents()) {
+	    try {
+		boolean fired = dreamingService.runDreamCycle(agent, memoryConfig, progress);
+		if (fired) {
+		    dreamed.add(agent.getFullName());
+		}
+	    } catch (Exception e) {
+		LOG.warn("Dream cycle failed for {}", agent.getFullName(), e);
+	    }
+	}
+	return dreamed;
+    }
+
+    private void runPonderCycles(Set<String> dreamedAgents) {
+	SimulationFile.MemorySeed memoryConfig = simulationSeed != null ? simulationSeed.getMemory() : null;
+	SimulationFile.DailyRhythmSeed rhythm = simulationSeed != null ? simulationSeed.getDailyRhythm() : null;
+	for (Agent agent : world.getAgents()) {
+	    boolean dreamFired = dreamedAgents.contains(agent.getFullName());
+	    try {
+		ponderService.runPonder(agent, memoryConfig, rhythm, progress, dreamFired);
+	    } catch (Exception e) {
+		LOG.warn("Ponder cycle failed for {}", agent.getFullName(), e);
+	    }
+	}
     }
 
     public List<ConversationResponse> getConversations() {
@@ -585,6 +677,82 @@ public class SimulationService {
 	    .sorted(Comparator.comparing(WorldProposal::getCreatedAtTick).reversed())
 	    .map(this::toWorldProposal)
 	    .collect(Collectors.toList());
+    }
+
+    public LedgerExportResponse getLedgerExport() {
+	LedgerExportResponse response = new LedgerExportResponse();
+	response.setGeneratedAtUtc(java.time.Instant.now().toString());
+	response.setScenario(simulationSeed != null ? SmallvilleConfig.getConfig().getModel() : "unknown");
+	response.setWorld(getWorldSnapshot());
+
+	// Full unwindowed proposal history
+	List<WorldSnapshotResponse.WorldProposalResponse> allProposals = proposals
+	    .stream()
+	    .sorted(Comparator.comparing(WorldProposal::getCreatedAtTick).reversed())
+	    .map(this::toWorldProposal)
+	    .collect(Collectors.toList());
+	response.setGovernanceLedger(allProposals);
+	response.setProposalHistoryFull(allProposals);
+
+	// Memory index for each agent
+	Map<String, MemoryLedgerIndex> memIndex = new HashMap<>();
+	for (Agent agent : world.getAgents()) {
+	    memIndex.put(agent.getFullName(), journalWriter.loadOrCreateIndex(agent.getFullName()));
+	}
+	response.setMemoryIndex(memIndex);
+
+	// Offline policy and governance policy summaries
+	response.setOfflinePolicy(Map.of(
+	    "offlineMode", false,
+	    "loopbackOnly", false
+	));
+	response.setGovernancePolicy(Map.of(
+	    "proposalTypes", new ArrayList<>(ALLOWED_PROPOSAL_TYPES),
+	    "pendingStatuses", new ArrayList<>(PENDING_PROPOSAL_STATUSES)
+	));
+
+	return response;
+    }
+
+    public AgentMemoryLedgerResponse getAgentMemoryLedger(String name) {
+	Agent agent = world.getAgent(name).orElseThrow(() -> new AgentNotFoundException(name));
+	AgentMemoryLedgerResponse response = new AgentMemoryLedgerResponse();
+	response.setAgent(agent.getFullName());
+
+	// Persona anchors
+	AgentMemoryLedgerResponse.PersonaAnchors anchors = new AgentMemoryLedgerResponse.PersonaAnchors();
+	anchors.setTraits(agent.getTraits());
+	anchors.setGoals(new ArrayList<>(agent.getGoals()));
+	anchors.setRituals(new ArrayList<>(agent.getRituals()));
+	anchors.setPersona(agent.getMemoryStream().getCharacteristics().stream().map(Memory::getDescription).collect(Collectors.toList()));
+	anchors.setSocialPreference(agent.getSocialPreference());
+	response.setPersonaAnchors(anchors);
+
+	// Affect
+	response.setAffect(agent.getAffect());
+
+	// Working memories
+	response.setWorking(agent.getMemoryStream().getWorkingMemories().stream().map(Memory::getDescription).collect(Collectors.toList()));
+
+	// Recent memories
+	response.setRecent(agent.getMemoryStream().getRecentMemories().stream().map(Memory::getDescription).collect(Collectors.toList()));
+
+	// Archived (all non-working, non-recent)
+	response.setArchived(agent.getMemoryStream().getMemories().stream().map(Memory::getDescription).collect(Collectors.toList()));
+
+	// Dream packs
+	response.setDreamPacks(journalWriter.loadDreamPacks(agent.getFullName()));
+
+	// Recall policy
+	SimulationFile.MemorySeed memCfg = simulationSeed != null ? simulationSeed.getMemory() : new SimulationFile.MemorySeed();
+	if (memCfg == null) memCfg = new SimulationFile.MemorySeed();
+	response.setRecallPolicy(Map.of(
+	    "recallTopK", memCfg.getRecallTopK(),
+	    "hotMemoryLimit", memCfg.getHotMemoryLimit(),
+	    "dreamIntervalTicks", memCfg.getDreamIntervalTicks()
+	));
+
+	return response;
     }
 
     public WorldSnapshotResponse.WorldProposalResponse approveWorldProposal(String id) {
@@ -708,6 +876,24 @@ public class SimulationService {
 	result.setRecentMemories(agent.getMemoryStream().getObservations().stream().sorted(Comparator.comparing(Observation::getTime).reversed()).limit(6).map(Memory::getDescription).collect(Collectors.toList()));
 	result.setShortPlans(agent.getMemoryStream().getPlans().stream().filter(plan -> plan.getType() == PlanType.SHORT_TERM).map(Plan::getDescription).collect(Collectors.toList()));
 	result.setLongPlans(agent.getMemoryStream().getPlans().stream().filter(plan -> plan.getType() == PlanType.LONG_TERM).map(Plan::getDescription).collect(Collectors.toList()));
+
+	// Affect summary
+	if (agent.getAffect() != null) {
+	    WorldSnapshotResponse.AffectSummary affectSummary = new WorldSnapshotResponse.AffectSummary();
+	    affectSummary.setMoodLabel(agent.getAffect().getMoodLabel());
+	    affectSummary.setValence(agent.getAffect().getValence());
+	    affectSummary.setActivation(agent.getAffect().getActivation());
+	    result.setAffect(affectSummary);
+	}
+
+	// Memory ledger summary
+	MemoryLedgerIndex ledgerIndex = journalWriter.loadOrCreateIndex(agent.getFullName());
+	WorldSnapshotResponse.MemoryLedgerSummary ledgerSummary = new WorldSnapshotResponse.MemoryLedgerSummary();
+	ledgerSummary.setHotCount(ledgerIndex.getHotCount());
+	ledgerSummary.setArchivedCount(ledgerIndex.getArchivedCount());
+	ledgerSummary.setDreamPackCount(ledgerIndex.getDreamPackCount());
+	result.setMemoryLedgerSummary(ledgerSummary);
+
 	return result;
     }
 

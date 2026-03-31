@@ -50,6 +50,17 @@ dailyRhythm:
   afternoonTea: "15:00-17:30"
   snack: "Flexible morning or afternoon"
 
+memory:
+  dreamIntervalTicks: 10
+  dreamWindowStart: "22:00"
+  dreamWindowEnd: "06:00"
+  hotMemoryLimit: 20
+  recallTopK: 5
+  archiveCompression: true
+  ponderEnabled: true
+  ponderBlendAlpha: 0.6
+  ponderCooldownTicks: 5
+
 agents:
   - name: "Jamie"
     location: "Blue House: Kitchen"

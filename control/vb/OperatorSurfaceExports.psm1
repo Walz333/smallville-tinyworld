@@ -473,4 +473,72 @@ function Export-RunComparisonSummaryCsv {
     }
 }
 
-Export-ModuleMember -Function Export-RunBundleSummaryCsv, Export-ProposalSummaryCsv, Export-ChecklistOutcomeCsv, Export-RunComparisonSummaryCsv
+function Export-LedgerBundle {
+    <#
+    .SYNOPSIS
+    Reads a ledger export JSON and writes decomposed bundle artifacts.
+    .PARAMETER LedgerExportPath
+    Path to the endpoint_ledger_export_*.json capture file.
+    .PARAMETER OutputDirectory
+    Directory to write ledger bundle artifacts into.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LedgerExportPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory
+    )
+
+    if (-not (Test-Path -LiteralPath $LedgerExportPath)) {
+        throw "Ledger export file not found: $LedgerExportPath"
+    }
+
+    $resolvedOutput = Resolve-ExportOutputDirectory -OutputDirectory $OutputDirectory
+
+    $raw = Get-Content -Path $LedgerExportPath -Raw -Encoding UTF8
+    $capture = $raw | ConvertFrom-Json
+    $export = if ($capture.body) { $capture.body } else { $capture }
+
+    if (-not (Test-Path -LiteralPath $resolvedOutput)) {
+        New-Item -ItemType Directory -Path $resolvedOutput -Force | Out-Null
+    }
+
+    # Full ledger export
+    $export | ConvertTo-Json -Depth 100 | Set-Content -Path (Join-Path $resolvedOutput 'ledger_export.json') -Encoding UTF8
+
+    # Governance ledger + proposal history
+    $governance = [ordered]@{
+        governanceLedger = @(Get-ViewProperty -Object $export -Name 'governanceLedger')
+        proposalHistoryFull = @(Get-ViewProperty -Object $export -Name 'proposalHistoryFull')
+    }
+    $governance | ConvertTo-Json -Depth 100 | Set-Content -Path (Join-Path $resolvedOutput 'governance_ledger.json') -Encoding UTF8
+
+    # Memory index
+    $memoryIndex = Get-ViewProperty -Object $export -Name 'memoryIndex'
+    if ($memoryIndex) {
+        $memoryIndex | ConvertTo-Json -Depth 100 | Set-Content -Path (Join-Path $resolvedOutput 'memory_index.json') -Encoding UTF8
+    }
+
+    # Per-agent memory ledger and dream packs (from memoryIndex)
+    if ($memoryIndex) {
+        foreach ($prop in $memoryIndex.PSObject.Properties) {
+            $agentName = $prop.Name
+            $safeName = $agentName -replace '[^a-zA-Z0-9_-]', '_'
+            $agentDir = Join-Path $resolvedOutput "agents\$safeName"
+            if (-not (Test-Path -LiteralPath $agentDir)) {
+                New-Item -ItemType Directory -Path $agentDir -Force | Out-Null
+            }
+            $prop.Value | ConvertTo-Json -Depth 100 | Set-Content -Path (Join-Path $agentDir 'memory-ledger.json') -Encoding UTF8
+        }
+    }
+
+    return [pscustomobject]@{
+        source_path = $LedgerExportPath
+        output_directory = $resolvedOutput
+        has_governance = ($null -ne (Get-ViewProperty -Object $export -Name 'governanceLedger'))
+        has_memory_index = ($null -ne $memoryIndex)
+    }
+}
+
+Export-ModuleMember -Function Export-RunBundleSummaryCsv, Export-ProposalSummaryCsv, Export-ChecklistOutcomeCsv, Export-RunComparisonSummaryCsv, Export-LedgerBundle

@@ -14,6 +14,8 @@ public class GeneralConfig {
     private String askShadowBridgeEndpoint;
     private int askShadowBridgeConnectTimeoutMs;
     private int askShadowBridgeCallTimeoutMs;
+    private boolean offlineMode;
+    private boolean loopbackOnly;
 
     public boolean isSimulationFile() {
 	return simulationFile;
@@ -109,6 +111,22 @@ public class GeneralConfig {
 
     public void setAskShadowBridgeCallTimeoutMs(int askShadowBridgeCallTimeoutMs) {
 	this.askShadowBridgeCallTimeoutMs = askShadowBridgeCallTimeoutMs;
+    }
+
+    public boolean isOfflineMode() {
+	return offlineMode;
+    }
+
+    public void setOfflineMode(boolean offlineMode) {
+	this.offlineMode = offlineMode;
+    }
+
+    public boolean isLoopbackOnly() {
+	return loopbackOnly;
+    }
+
+    public void setLoopbackOnly(boolean loopbackOnly) {
+	this.loopbackOnly = loopbackOnly;
     }
 
 }

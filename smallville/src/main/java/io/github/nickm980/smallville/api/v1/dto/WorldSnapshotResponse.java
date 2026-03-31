@@ -247,6 +247,8 @@ public class WorldSnapshotResponse {
 	private List<String> longPlans = new ArrayList<String>();
 	private List<String> goals = new ArrayList<String>();
 	private List<String> rituals = new ArrayList<String>();
+	private AffectSummary affect;
+	private MemoryLedgerSummary memoryLedgerSummary;
 
 	public String getName() {
 	    return name;
@@ -366,6 +368,82 @@ public class WorldSnapshotResponse {
 
 	public void setRituals(List<String> rituals) {
 	    this.rituals = rituals;
+	}
+
+	public AffectSummary getAffect() {
+	    return affect;
+	}
+
+	public void setAffect(AffectSummary affect) {
+	    this.affect = affect;
+	}
+
+	public MemoryLedgerSummary getMemoryLedgerSummary() {
+	    return memoryLedgerSummary;
+	}
+
+	public void setMemoryLedgerSummary(MemoryLedgerSummary memoryLedgerSummary) {
+	    this.memoryLedgerSummary = memoryLedgerSummary;
+	}
+    }
+
+    public static class AffectSummary {
+	private String moodLabel;
+	private double valence;
+	private double activation;
+
+	public String getMoodLabel() {
+	    return moodLabel;
+	}
+
+	public void setMoodLabel(String moodLabel) {
+	    this.moodLabel = moodLabel;
+	}
+
+	public double getValence() {
+	    return valence;
+	}
+
+	public void setValence(double valence) {
+	    this.valence = valence;
+	}
+
+	public double getActivation() {
+	    return activation;
+	}
+
+	public void setActivation(double activation) {
+	    this.activation = activation;
+	}
+    }
+
+    public static class MemoryLedgerSummary {
+	private int hotCount;
+	private int archivedCount;
+	private int dreamPackCount;
+
+	public int getHotCount() {
+	    return hotCount;
+	}
+
+	public void setHotCount(int hotCount) {
+	    this.hotCount = hotCount;
+	}
+
+	public int getArchivedCount() {
+	    return archivedCount;
+	}
+
+	public void setArchivedCount(int archivedCount) {
+	    this.archivedCount = archivedCount;
+	}
+
+	public int getDreamPackCount() {
+	    return dreamPackCount;
+	}
+
+	public void setDreamPackCount(int dreamPackCount) {
+	    this.dreamPackCount = dreamPackCount;
 	}
     }
 

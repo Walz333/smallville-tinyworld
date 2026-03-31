@@ -40,6 +40,25 @@ public class RuntimeSettingsService {
 	this.config = config;
 	this.defaultModel = config.getModel();
 	this.providerMode = determineProviderMode(config.getApiPath());
+	enforceIsolationPolicy();
+    }
+
+    private void enforceIsolationPolicy() {
+	if (config.isLoopbackOnly()) {
+	    if (!isLoopbackApiPath(config.getApiPath())) {
+		throw new IllegalStateException(
+		    "loopbackOnly is true but apiPath is not loopback: " + config.getApiPath());
+	    }
+	    if (config.isAskShadowBridgeEnabled() && !isLoopbackApiPath(getAskShadowBridgeEndpoint())) {
+		throw new IllegalStateException(
+		    "loopbackOnly is true but askShadowBridgeEndpoint is not loopback: " + getAskShadowBridgeEndpoint());
+	    }
+	    LOG.info("Loopback-only mode enforced — all external endpoints verified as loopback.");
+	}
+
+	if (config.isOfflineMode()) {
+	    LOG.info("Offline mode enabled — cloud support disabled.");
+	}
     }
 
     public String getDefaultModel() {
@@ -186,7 +205,7 @@ public class RuntimeSettingsService {
 	return "hosted-compatible";
     }
 
-    private boolean isLoopbackApiPath(String apiPath) {
+    public boolean isLoopbackApiPath(String apiPath) {
 	try {
 	    URI uri = new URI(apiPath);
 	    String host = uri.getHost();

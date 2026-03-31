@@ -1255,6 +1255,7 @@ try {
   Invoke-JsonRequest -Method GET -BaseUri $baseUri -Path '/info' -TickIndex 0 -OutputPath (Join-Path $outputRoot 'endpoint_info_cold.json') | Out-Null
   Invoke-JsonRequest -Method GET -BaseUri $baseUri -Path '/agents' -TickIndex 0 -OutputPath (Join-Path $outputRoot 'endpoint_agents_cold.json') | Out-Null
   Invoke-JsonRequest -Method GET -BaseUri $baseUri -Path '/world/proposals' -TickIndex 0 -OutputPath (Join-Path $outputRoot 'endpoint_world_proposals_cold.json') | Out-Null
+  Invoke-JsonRequestSafely -Method GET -BaseUri $baseUri -Path '/world/ledger/export' -TickIndex 0 -OutputPath (Join-Path $outputRoot 'endpoint_ledger_export_cold.json') | Out-Null
 
   $frozenModel = if ($modelsBody.defaultModel) { [string]$modelsBody.defaultModel } else { $configuredModel }
   $providerMode = if ($modelsBody.providerMode) { [string]$modelsBody.providerMode } else { 'unknown' }
@@ -1328,6 +1329,7 @@ try {
 
   $currentStep = 'capture final proposal state'
   $preApprovalProposalResponse = Invoke-JsonRequest -Method GET -BaseUri $baseUri -Path '/world/proposals' -TickIndex $Ticks -OutputPath $preApprovalProposalCapturePath -TimeoutSec 60
+  Invoke-JsonRequestSafely -Method GET -BaseUri $baseUri -Path '/world/ledger/export' -TickIndex $Ticks -OutputPath (Join-Path $outputRoot 'endpoint_ledger_export_final.json') | Out-Null
   $finalProposalResponse = $preApprovalProposalResponse
 
   if ($approvalRequested) {
@@ -1450,6 +1452,7 @@ try {
   $currentStep = 'capture restart endpoints'
   Invoke-JsonRequest -Method GET -BaseUri $baseUri -Path '/world' -TickIndex $Ticks -OutputPath (Join-Path $outputRoot 'endpoint_world_restart_cold.json') -TimeoutSec 60 | Out-Null
   Invoke-JsonRequest -Method GET -BaseUri $baseUri -Path '/state' -TickIndex $Ticks -OutputPath (Join-Path $outputRoot 'endpoint_state_restart_cold.json') -TimeoutSec 60 | Out-Null
+  Invoke-JsonRequestSafely -Method GET -BaseUri $baseUri -Path '/world/ledger/export' -TickIndex $Ticks -OutputPath (Join-Path $outputRoot 'endpoint_ledger_export_restart_cold.json') -TimeoutSec 60 | Out-Null
 
   if ($restartScenarioLog) {
     Write-LogExcerpt -SourceLogPath $restartScenarioLog -OutputPath (Join-Path $outputRoot 'log_excerpt_restart.txt') -RunId $RunId -MatchTerms "Starting server..., Smallville server started on port $Port" -SearchTerms @('Starting server...', "Smallville server started on port $Port")

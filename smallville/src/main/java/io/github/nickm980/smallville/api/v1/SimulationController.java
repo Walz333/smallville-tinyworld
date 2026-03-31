@@ -146,6 +146,11 @@ public final class SimulationController {
 	ctx.json(Map.of("proposals", service.getWorldProposals()));
     }
 
+    @Get("/world/ledger/export")
+    public void getLedgerExport(Context ctx) {
+	ctx.json(service.getLedgerExport());
+    }
+
     @Post("/world/proposals/{id}/approve")
     public void approveWorldProposal(Context ctx) {
 	try {
@@ -186,6 +191,13 @@ public final class SimulationController {
 	handleAgentNotFound(ctx, () -> {
 	    AgentStateResponse res = service.getAgentState(name);
 	    ctx.json(res);
+	});
+    }
+
+    @Get("/agents/{name}/memory-ledger")
+    public void getAgentMemoryLedger(Context ctx, @Param("name") String name) {
+	handleAgentNotFound(ctx, () -> {
+	    ctx.json(service.getAgentMemoryLedger(name));
 	});
     }
 

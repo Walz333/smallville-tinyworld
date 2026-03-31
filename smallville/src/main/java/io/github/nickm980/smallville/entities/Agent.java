@@ -10,6 +10,7 @@ public class Agent {
 
     private MemoryStream memories;
     private String name;
+    private AffectState affect = AffectState.neutral(0);
     private ActionHistory currentAction;
     private Location location;
     private String traits;
@@ -109,5 +110,13 @@ public class Agent {
 
     public void setRituals(List<String> rituals) {
 	this.rituals = rituals == null ? new ArrayList<String>() : new ArrayList<String>(rituals);
+    }
+
+    public AffectState getAffect() {
+	return affect;
+    }
+
+    public void setAffect(AffectState affect) {
+	this.affect = affect == null ? AffectState.neutral(0) : affect;
     }
 }

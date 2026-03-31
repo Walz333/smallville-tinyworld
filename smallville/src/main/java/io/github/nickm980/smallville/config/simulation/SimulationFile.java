@@ -8,6 +8,7 @@ public class SimulationFile {
     private List<AgentSeed> agents;
     private WorldBuildingSeed worldBuilding;
     private DailyRhythmSeed dailyRhythm;
+    private MemorySeed memory;
 
     public WorldSeed getWorld() {
 	return world;
@@ -39,6 +40,14 @@ public class SimulationFile {
 
     public void setDailyRhythm(DailyRhythmSeed dailyRhythm) {
 	this.dailyRhythm = dailyRhythm;
+    }
+
+    public MemorySeed getMemory() {
+	return memory;
+    }
+
+    public void setMemory(MemorySeed memory) {
+	this.memory = memory;
     }
 
     public static class WorldSeed {
@@ -278,6 +287,90 @@ public class SimulationFile {
 
 	public void setSnack(String snack) {
 	    this.snack = snack;
+	}
+    }
+
+    public static class MemorySeed {
+	private int dreamIntervalTicks = 10;
+	private String dreamWindowStart = "22:00";
+	private String dreamWindowEnd = "06:00";
+	private int hotMemoryLimit = 20;
+	private int recallTopK = 5;
+	private boolean archiveCompression = true;
+	private boolean ponderEnabled = false;
+	private double ponderBlendAlpha = 0.6;
+	private int ponderCooldownTicks = 5;
+
+	public int getDreamIntervalTicks() {
+	    return dreamIntervalTicks;
+	}
+
+	public void setDreamIntervalTicks(int dreamIntervalTicks) {
+	    this.dreamIntervalTicks = dreamIntervalTicks;
+	}
+
+	public String getDreamWindowStart() {
+	    return dreamWindowStart;
+	}
+
+	public void setDreamWindowStart(String dreamWindowStart) {
+	    this.dreamWindowStart = dreamWindowStart;
+	}
+
+	public String getDreamWindowEnd() {
+	    return dreamWindowEnd;
+	}
+
+	public void setDreamWindowEnd(String dreamWindowEnd) {
+	    this.dreamWindowEnd = dreamWindowEnd;
+	}
+
+	public int getHotMemoryLimit() {
+	    return hotMemoryLimit;
+	}
+
+	public void setHotMemoryLimit(int hotMemoryLimit) {
+	    this.hotMemoryLimit = hotMemoryLimit;
+	}
+
+	public int getRecallTopK() {
+	    return recallTopK;
+	}
+
+	public void setRecallTopK(int recallTopK) {
+	    this.recallTopK = recallTopK;
+	}
+
+	public boolean isArchiveCompression() {
+	    return archiveCompression;
+	}
+
+	public void setArchiveCompression(boolean archiveCompression) {
+	    this.archiveCompression = archiveCompression;
+	}
+
+	public boolean isPonderEnabled() {
+	    return ponderEnabled;
+	}
+
+	public void setPonderEnabled(boolean ponderEnabled) {
+	    this.ponderEnabled = ponderEnabled;
+	}
+
+	public double getPonderBlendAlpha() {
+	    return ponderBlendAlpha;
+	}
+
+	public void setPonderBlendAlpha(double ponderBlendAlpha) {
+	    this.ponderBlendAlpha = ponderBlendAlpha;
+	}
+
+	public int getPonderCooldownTicks() {
+	    return ponderCooldownTicks;
+	}
+
+	public void setPonderCooldownTicks(int ponderCooldownTicks) {
+	    this.ponderCooldownTicks = ponderCooldownTicks;
 	}
     }
 }

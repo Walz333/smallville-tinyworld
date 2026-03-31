@@ -1,0 +1,44 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: Affect State
+description: Schema for agent affect state as produced by the dreaming phase. Valence, activation, and socialDrive are bounded doubles derived deterministically from dream-cycle memory statistics.
+type: object
+additionalProperties: false
+properties:
+  moodLabel:
+    type: string
+    enum:
+      - content
+      - calm
+      - neutral
+      - uneasy
+      - distressed
+  valence:
+    type: number
+    minimum: -1.0
+    maximum: 1.0
+  activation:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  socialDrive:
+    type: number
+    minimum: 0.0
+    maximum: 1.0
+  focusTarget:
+    type:
+      - string
+      - "null"
+  drivers:
+    type: array
+    items:
+      type: string
+  updatedAtTick:
+    type: integer
+    minimum: 0
+required:
+  - moodLabel
+  - valence
+  - activation
+  - socialDrive
+  - drivers
+  - updatedAtTick
