@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.nickm980.smallville.entities.AffectState;
 import io.github.nickm980.smallville.memory.ledger.DreamPack;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
@@ -33,7 +34,7 @@ public class MemoryJournalWriterTest {
 	MemoryLedgerEntry entry = new MemoryLedgerEntry();
 	entry.setAgentName("TestAgent");
 	entry.setTick(1);
-	entry.setType("observation");
+	entry.setType(LedgerEntryType.OBSERVATION);
 	entry.setDescription("watered the garden");
 
 	writer.appendEntry("TestAgent", entry);
@@ -49,7 +50,7 @@ public class MemoryJournalWriterTest {
 	    MemoryLedgerEntry entry = new MemoryLedgerEntry();
 	    entry.setAgentName("TestAgent");
 	    entry.setTick(i);
-	    entry.setType("observation");
+	    entry.setType(LedgerEntryType.OBSERVATION);
 	    entry.setDescription("event " + i);
 	    writer.appendEntry("TestAgent", entry);
 	}
@@ -124,15 +125,15 @@ public class MemoryJournalWriterTest {
 	    MemoryLedgerEntry entry = new MemoryLedgerEntry();
 	    entry.setAgentName("TestAgent");
 	    entry.setTick(i);
-	    entry.setType(i % 2 == 0 ? "observation" : "plan");
+	    entry.setType(i % 2 == 0 ? LedgerEntryType.OBSERVATION : LedgerEntryType.PLAN);
 	    entry.setDescription("entry " + i);
 	    writer.appendEntry("TestAgent", entry);
 	}
 
-	List<MemoryLedgerEntry> observations = writer.loadRecentEntriesByType("TestAgent", "observation", 3);
+	List<MemoryLedgerEntry> observations = writer.loadRecentEntriesByType("TestAgent", LedgerEntryType.OBSERVATION, 3);
 	assertEquals(3, observations.size());
 	for (MemoryLedgerEntry e : observations) {
-	    assertEquals("observation", e.getType());
+	    assertEquals(LedgerEntryType.OBSERVATION, e.getType());
 	}
     }
 
@@ -142,7 +143,7 @@ public class MemoryJournalWriterTest {
 	MemoryLedgerEntry entry = new MemoryLedgerEntry();
 	entry.setAgentName("Agent With Spaces");
 	entry.setTick(1);
-	entry.setType("observation");
+	entry.setType(LedgerEntryType.OBSERVATION);
 	entry.setDescription("test");
 
 	writer.appendEntry("Agent With Spaces", entry);

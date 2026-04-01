@@ -15,6 +15,7 @@ import io.github.nickm980.smallville.memory.Memory;
 import io.github.nickm980.smallville.memory.MemoryStream;
 import io.github.nickm980.smallville.memory.Observation;
 import io.github.nickm980.smallville.memory.ledger.DreamPack;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
@@ -100,7 +101,7 @@ public class RecallService {
 	// Log to journal
 	journalWriter.appendEntry(agent.getFullName(), new MemoryLedgerEntry(
 	    agent.getFullName(), tick, SimulationTime.now(),
-	    "recall", "Recall: " + query + " → " + truncate(candidate.description, 80),
+	    LedgerEntryType.RECALL, "Recall: " + query + " \u2192 " + truncate(candidate.description, 80),
 	    candidate.score, candidate.sourceLayer));
 
 	// Update index

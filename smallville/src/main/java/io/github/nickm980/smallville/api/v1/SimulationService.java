@@ -63,6 +63,7 @@ import io.github.nickm980.smallville.memory.dreaming.DreamingService;
 import io.github.nickm980.smallville.memory.dreaming.PonderService;
 import io.github.nickm980.smallville.memory.dreaming.RecallService;
 import io.github.nickm980.smallville.memory.ledger.DreamPack;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
@@ -186,7 +187,7 @@ public class SimulationService {
 	    }
 
 	    // Restore hot memories as observations into memory stream
-	    List<MemoryLedgerEntry> recentEntries = journalWriter.loadRecentEntriesByType(name, "observation", index.getHotCount() > 0 ? index.getHotCount() : 20);
+	    List<MemoryLedgerEntry> recentEntries = journalWriter.loadRecentEntriesByType(name, LedgerEntryType.OBSERVATION, index.getHotCount() > 0 ? index.getHotCount() : 20);
 	    for (MemoryLedgerEntry entry : recentEntries) {
 		if (entry.getDescription() != null && !entry.getDescription().isBlank()) {
 		    agent.getMemoryStream().add(new Observation(entry.getDescription()));

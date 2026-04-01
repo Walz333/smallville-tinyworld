@@ -19,6 +19,7 @@ import io.github.nickm980.smallville.entities.SimulationTime;
 import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.memory.Memory;
 import io.github.nickm980.smallville.memory.MemoryStream;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
@@ -117,7 +118,7 @@ public class PonderService {
 	    breakWindow, preValence, nudged.getValence(), preMood, nudged.getMoodLabel());
 	MemoryLedgerEntry entry = new MemoryLedgerEntry(
 	    agent.getFullName(), currentTick, SimulationTime.now(),
-	    "ponder", desc, 0, null);
+	    LedgerEntryType.PONDER, desc, 0, null);
 	journalWriter.appendEntry(agent.getFullName(), entry);
 
 	lastPonderTick.put(agent.getFullName(), currentTick);

@@ -16,7 +16,7 @@ public class MemoryLedgerEntry {
     private String agentName;
     private int tick;
     private LocalDateTime timestamp;
-    private String type; // observation|plan|reflection|characteristic|recall|dream-compress|ponder
+    private LedgerEntryType type;
     private String description;
     private String sourceHash;
     private double importance;
@@ -25,7 +25,7 @@ public class MemoryLedgerEntry {
     public MemoryLedgerEntry() {
     }
 
-    public MemoryLedgerEntry(String agentName, int tick, LocalDateTime timestamp, String type,
+    public MemoryLedgerEntry(String agentName, int tick, LocalDateTime timestamp, LedgerEntryType type,
 			     String description, double importance, String retentionReason) {
 	this.id = UUID.randomUUID().toString();
 	this.agentName = agentName;
@@ -89,11 +89,11 @@ public class MemoryLedgerEntry {
 	this.timestamp = timestamp;
     }
 
-    public String getType() {
+    public LedgerEntryType getType() {
 	return type;
     }
 
-    public void setType(String type) {
+    public void setType(LedgerEntryType type) {
 	this.type = type;
     }
 

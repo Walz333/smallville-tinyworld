@@ -72,6 +72,7 @@ Events are appended to `.smallville-memory/agents/<name>/events.ndjson`, one JSO
 | `characteristic` | Persona characteristic loaded from config |
 | `recall` | Memory recalled via RecallService |
 | `dream-compress` | Dream cycle compression event |
+| `ponder` | Ponder nudge reflection during break window |
 
 ### Index File
 

@@ -25,6 +25,17 @@ properties:
     description: Complete proposal history including all reviewed and pending proposals.
     items:
       type: object
+  ledgerEntryType:
+    type: string
+    description: Canonical vocabulary for MemoryLedgerEntry.type. Authoritative source — Java enum LedgerEntryType and Python tests must match exactly.
+    enum:
+      - observation
+      - plan
+      - reflection
+      - characteristic
+      - recall
+      - dream-compress
+      - ponder
   memoryIndex:
     type: object
     description: Per-agent memory ledger index keyed by agent name.

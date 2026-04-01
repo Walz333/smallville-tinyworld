@@ -18,6 +18,7 @@ import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.memory.Observation;
 import io.github.nickm980.smallville.memory.dreaming.DreamingService;
 import io.github.nickm980.smallville.memory.ledger.DreamPack;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
@@ -107,7 +108,7 @@ public class MemoryPersistenceIntegrationTest {
 
 	List<MemoryLedgerEntry> entries = journalWriter.loadEntries(agent.getFullName());
 	assertFalse(entries.isEmpty(), "Should have at least one ledger entry");
-	boolean hasDreamCompress = entries.stream().anyMatch(e -> "dream-compress".equals(e.getType()));
+	boolean hasDreamCompress = entries.stream().anyMatch(e -> LedgerEntryType.DREAM_COMPRESS == e.getType());
 	assertTrue(hasDreamCompress, "Should have a dream-compress entry");
     }
 

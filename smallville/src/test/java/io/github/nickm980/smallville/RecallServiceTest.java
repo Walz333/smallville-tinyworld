@@ -16,6 +16,7 @@ import io.github.nickm980.smallville.memory.Characteristic;
 import io.github.nickm980.smallville.memory.Observation;
 import io.github.nickm980.smallville.memory.dreaming.DreamingService;
 import io.github.nickm980.smallville.memory.dreaming.RecallService;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
 import io.github.nickm980.smallville.memory.ledger.RecallEvent;
 
@@ -99,7 +100,7 @@ public class RecallServiceTest {
 	// Verify recall entry was written to journal
 	List<io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry> entries = journalWriter.loadEntries(agent.getFullName());
 	boolean hasRecallEntry = entries.stream()
-	    .anyMatch(e -> "recall".equals(e.getType()));
+	    .anyMatch(e -> LedgerEntryType.RECALL == e.getType());
 	assertTrue(hasRecallEntry, "Journal should contain a recall entry");
     }
 }

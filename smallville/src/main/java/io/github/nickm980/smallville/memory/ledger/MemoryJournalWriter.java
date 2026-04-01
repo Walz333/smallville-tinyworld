@@ -192,12 +192,12 @@ public class MemoryJournalWriter {
     /**
      * Load recent entries of a specific type (for restart reload of hot memories).
      */
-    public List<MemoryLedgerEntry> loadRecentEntriesByType(String agentName, String type, int limit) {
+    public List<MemoryLedgerEntry> loadRecentEntriesByType(String agentName, LedgerEntryType type, int limit) {
 	List<MemoryLedgerEntry> all = loadEntries(agentName);
 	List<MemoryLedgerEntry> filtered = new ArrayList<>();
 	// Walk backwards for most recent
 	for (int i = all.size() - 1; i >= 0 && filtered.size() < limit; i--) {
-	    if (type.equals(all.get(i).getType())) {
+	    if (type == all.get(i).getType()) {
 		filtered.add(all.get(i));
 	    }
 	}

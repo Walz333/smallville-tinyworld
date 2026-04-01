@@ -22,6 +22,7 @@ import io.github.nickm980.smallville.memory.MemoryStream;
 import io.github.nickm980.smallville.memory.Observation;
 import io.github.nickm980.smallville.memory.Plan;
 import io.github.nickm980.smallville.memory.ledger.DreamPack;
+import io.github.nickm980.smallville.memory.ledger.LedgerEntryType;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerEntry;
 import io.github.nickm980.smallville.memory.ledger.MemoryLedgerIndex;
 import io.github.nickm980.smallville.memory.ledger.MemoryJournalWriter;
@@ -108,7 +109,7 @@ public class DreamingService {
 	    hotSet.size(), coldSet.size(), affect.getMoodLabel());
 	MemoryLedgerEntry entry = new MemoryLedgerEntry(
 	    agent.getFullName(), currentTick, SimulationTime.now(),
-	    "dream-compress", dreamDesc, 0, null);
+	    LedgerEntryType.DREAM_COMPRESS, dreamDesc, 0, null);
 	journalWriter.appendEntry(agent.getFullName(), entry);
 
 	lastDreamTick.put(agent.getFullName(), currentTick);
