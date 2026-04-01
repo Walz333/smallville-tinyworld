@@ -1,6 +1,9 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 title: Agent Memory Ledger
-description: Schema for GET /agents/{name}/memory-ledger response. Exposes per-agent persona anchors, affect state, memory layers (working/recent/archived), dream packs, and recall policy.
+description: >-
+  Schema for GET /agents/{name}/memory-ledger response. Exposes per-agent
+  persona anchors, affect state (from dream cycles and ponder nudges),
+  memory layers (working/recent/archived), dream packs, and recall policy.
 type: object
 additionalProperties: false
 properties:

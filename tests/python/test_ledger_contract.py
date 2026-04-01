@@ -23,7 +23,7 @@ def find_ledger_export_files():
 
 
 def load_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, 'r', encoding='utf-8-sig') as f:
         raw = json.load(f)
     # Handle endpoint capture wrapper
     if 'body' in raw and 'generatedAtUtc' not in raw:
@@ -54,17 +54,25 @@ class TestLedgerExportSchema:
     )
     def test_captured_exports_have_required_fields(self):
         try:
-            from jsonschema import validate, ValidationError
+            from jsonschema import Draft202012Validator, ValidationError
+            from referencing import Registry, Resource
         except ImportError:
-            pytest.skip('jsonschema not installed')
+            pytest.skip('jsonschema or referencing not installed')
 
         schema = load_yaml_schema('ledger-export.schema.yaml')
+        # Build a registry so $ref: "affect-state.schema.yaml" etc. can resolve
+        registry = Registry()
+        for schema_file in os.listdir(SCHEMA_DIR):
+            if schema_file.endswith('.schema.yaml'):
+                s = load_yaml_schema(schema_file)
+                resource = Resource.from_contents(s)
+                registry = registry.with_resource(schema_file, resource)
+        validator = Draft202012Validator(schema, registry=registry)
         for path in find_ledger_export_files():
             data = load_json(path)
-            try:
-                validate(instance=data, schema=schema)
-            except ValidationError as e:
-                pytest.fail(f'{path}: {e.message}')
+            errors = list(validator.iter_errors(data))
+            if errors:
+                pytest.fail(f'{path}: {errors[0].message}')
 
     @pytest.mark.skipif(
         not find_ledger_export_files(),
@@ -89,3 +97,34 @@ class TestLedgerExportSchema:
                     assert isinstance(agent_name, str)
                     assert 'agentName' in index or 'totalEvents' in index, \
                         f'{path}: memoryIndex entry for {agent_name} missing expected fields'
+
+    def test_memory_index_schema_includes_ponder_fields(self):
+        """Verify the ledger-export schema defines ponderCount and lastPonderTick."""
+        schema = load_yaml_schema('ledger-export.schema.yaml')
+        mem_props = (schema.get('properties', {})
+                     .get('memoryIndex', {})
+                     .get('additionalProperties', {})
+                     .get('properties', {}))
+        assert 'ponderCount' in mem_props, \
+            'ledger-export schema missing ponderCount in memoryIndex'
+        assert 'lastPonderTick' in mem_props, \
+            'ledger-export schema missing lastPonderTick in memoryIndex'
+
+    @pytest.mark.skipif(
+        not find_ledger_export_files(),
+        reason='No ledger export captures found in runs/'
+    )
+    def test_memory_index_ponder_fields_when_present(self):
+        """If memoryIndex entries have ponder fields, validate their types."""
+        for path in find_ledger_export_files():
+            data = load_json(path)
+            if 'memoryIndex' not in data:
+                continue
+            for agent_name, index in data['memoryIndex'].items():
+                if 'ponderCount' in index:
+                    assert isinstance(index['ponderCount'], int), \
+                        f'{path}: {agent_name} ponderCount should be int'
+                    assert index['ponderCount'] >= 0
+                if 'lastPonderTick' in index:
+                    assert isinstance(index['lastPonderTick'], int), \
+                        f'{path}: {agent_name} lastPonderTick should be int'

@@ -92,6 +92,24 @@ class TestAffectStateSchema:
         assert valence.get('minimum') == -1.0
         assert valence.get('maximum') == 1.0
 
+    def test_affect_state_schema_documents_ponder_nudge(self):
+        """Verify the affect-state schema description references ponder nudges."""
+        schema = load_yaml_schema('affect-state.schema.yaml')
+        desc = schema.get('description', '')
+        assert 'ponder' in desc.lower(), \
+            'affect-state schema description should reference ponder nudges'
+
+    def test_activation_and_social_drive_bounds(self):
+        """Verify activation and socialDrive have correct bounds for ponder modulation."""
+        schema = load_yaml_schema('affect-state.schema.yaml')
+        props = schema.get('properties', {})
+        activation = props.get('activation', {})
+        assert activation.get('minimum') == 0.0
+        assert activation.get('maximum') == 1.0
+        social = props.get('socialDrive', {})
+        assert social.get('minimum') == 0.0
+        assert social.get('maximum') == 1.0
+
 
 class TestDreamPackSchema:
     """Validate the dream-pack schema independently."""

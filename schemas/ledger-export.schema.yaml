@@ -45,6 +45,14 @@ properties:
           type: integer
         lastRecallTick:
           type: integer
+        ponderCount:
+          type: integer
+          minimum: 0
+          description: Number of ponder nudges applied to this agent.
+        lastPonderTick:
+          type: integer
+          minimum: 0
+          description: Tick at which the most recent ponder nudge was applied.
         lastAffect:
           $ref: "affect-state.schema.yaml"
       required:

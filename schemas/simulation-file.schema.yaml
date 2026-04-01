@@ -110,10 +110,63 @@ $defs:
         type:
           - string
           - "null"
+      eveningWind:
+        type:
+          - string
+          - "null"
+        description: >-
+          Evening wind-down window (e.g. "19:30-21:30"). Ponder nudges
+          during this window boost socialDrive and damp activation.
       snack:
         type:
           - string
           - "null"
+  memorySeed:
+    type: object
+    additionalProperties: false
+    description: Memory subsystem configuration for dream cycles, ponder nudges, and recall.
+    properties:
+      dreamIntervalTicks:
+        type: integer
+        minimum: 1
+      dreamWindowStart:
+        type: string
+        description: Start of the dream-eligible window (HH:MM format).
+      dreamWindowEnd:
+        type: string
+        description: End of the dream-eligible window (HH:MM format).
+      hotMemoryLimit:
+        type: integer
+        minimum: 1
+      recallTopK:
+        type: integer
+        minimum: 1
+      archiveCompression:
+        type: boolean
+      ponderEnabled:
+        type: boolean
+        description: Whether daytime ponder nudges are active.
+      ponderBlendAlpha:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+        description: >-
+          Weight for existing affect in ponder blend (1.0 = keep existing,
+          0.0 = fully adopt ponder valence).
+      ponderCooldownTicks:
+        type: integer
+        minimum: 0
+        description: Minimum ticks between ponder nudges.
+      eveningSocialBoost:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+        description: socialDrive increase applied during evening-wind ponder.
+      eveningActivationDamp:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+        description: activation decrease applied during evening-wind ponder.
 properties:
   world:
     $ref: "#/$defs/worldSeed"
@@ -125,6 +178,8 @@ properties:
     $ref: "#/$defs/worldBuildingSeed"
   dailyRhythm:
     $ref: "#/$defs/dailyRhythmSeed"
+  memory:
+    $ref: "#/$defs/memorySeed"
 required:
   - world
   - agents
