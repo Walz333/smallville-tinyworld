@@ -108,4 +108,50 @@ public class AffectStateNudgeTest {
 	    throw new AssertionError(message + ": expected > " + reference + " but was " + actual);
 	}
     }
+
+    // --- Evening nudge tests ---
+
+    @Test
+    public void test_withEveningNudge_blends_valence_and_boosts_social() {
+	AffectState state = new AffectState("distressed", -0.82, 0.6, 0.3, null, List.of(), 1);
+
+	AffectState nudged = state.withEveningNudge(0.0, 0.6, 0.2, 0.1, 5);
+
+	// Valence: 0.6 * (-0.82) + 0.4 * 0.0 = -0.492
+	assertEquals(-0.492, nudged.getValence(), 0.001, "Valence should blend same as withNudge");
+	assertEquals("uneasy", nudged.getMoodLabel());
+	// Activation: 0.6 - 0.1 = 0.5
+	assertEquals(0.5, nudged.getActivation(), 0.001, "Activation should be damped by 0.1");
+	// SocialDrive: 0.3 + 0.2 = 0.5
+	assertEquals(0.5, nudged.getSocialDrive(), 0.001, "SocialDrive should be boosted by 0.2");
+    }
+
+    @Test
+    public void test_withEveningNudge_socialDrive_clamped_at_one() {
+	AffectState state = new AffectState("calm", 0.2, 0.5, 0.9, null, List.of(), 1);
+	AffectState nudged = state.withEveningNudge(0.2, 0.5, 0.3, 0.0, 5);
+
+	// SocialDrive: 0.9 + 0.3 = 1.2 → clamped to 1.0
+	assertEquals(1.0, nudged.getSocialDrive(), 0.001, "SocialDrive should clamp to 1.0");
+    }
+
+    @Test
+    public void test_withEveningNudge_activation_clamped_at_zero() {
+	AffectState state = new AffectState("calm", 0.2, 0.05, 0.5, null, List.of(), 1);
+	AffectState nudged = state.withEveningNudge(0.2, 0.5, 0.0, 0.2, 5);
+
+	// Activation: 0.05 - 0.2 = -0.15 → clamped to 0.0
+	assertEquals(0.0, nudged.getActivation(), 0.001, "Activation should clamp to 0.0");
+    }
+
+    @Test
+    public void test_withEveningNudge_preserves_focus_and_drivers() {
+	AffectState state = new AffectState("uneasy", -0.3, 0.7, 0.4, "tea time",
+		List.of("evening routine", "gate check"), 1);
+	AffectState nudged = state.withEveningNudge(0.1, 0.5, 0.15, 0.1, 8);
+
+	assertEquals("tea time", nudged.getFocusTarget(), "Focus should be preserved");
+	assertEquals(2, nudged.getDrivers().size(), "Drivers should be preserved");
+	assertEquals(8, nudged.getUpdatedAtTick());
+    }
 }

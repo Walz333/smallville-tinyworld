@@ -239,6 +239,7 @@ public class SimulationFile {
 	private String dinner = "18:00-20:30";
 	private String morningTea = "06:00-10:00";
 	private String afternoonTea = "15:00-17:30";
+	private String eveningWind = null;
 	private String snack = "Flexible morning or afternoon";
 
 	public String getBreakfast() {
@@ -281,6 +282,14 @@ public class SimulationFile {
 	    this.afternoonTea = afternoonTea;
 	}
 
+	public String getEveningWind() {
+	    return eveningWind;
+	}
+
+	public void setEveningWind(String eveningWind) {
+	    this.eveningWind = eveningWind;
+	}
+
 	public String getSnack() {
 	    return snack;
 	}
@@ -300,6 +309,8 @@ public class SimulationFile {
 	private boolean ponderEnabled = false;
 	private double ponderBlendAlpha = 0.6;
 	private int ponderCooldownTicks = 5;
+	private double eveningSocialBoost = 0.2;
+	private double eveningActivationDamp = 0.1;
 
 	public int getDreamIntervalTicks() {
 	    return dreamIntervalTicks;
@@ -371,6 +382,22 @@ public class SimulationFile {
 
 	public void setPonderCooldownTicks(int ponderCooldownTicks) {
 	    this.ponderCooldownTicks = ponderCooldownTicks;
+	}
+
+	public double getEveningSocialBoost() {
+	    return eveningSocialBoost;
+	}
+
+	public void setEveningSocialBoost(double eveningSocialBoost) {
+	    this.eveningSocialBoost = eveningSocialBoost;
+	}
+
+	public double getEveningActivationDamp() {
+	    return eveningActivationDamp;
+	}
+
+	public void setEveningActivationDamp(double eveningActivationDamp) {
+	    this.eveningActivationDamp = eveningActivationDamp;
 	}
     }
 }

@@ -94,7 +94,14 @@ public class PonderService {
 
 	// Blend with existing affect
 	double alpha = memConfig.getPonderBlendAlpha();
-	AffectState nudged = agent.getAffect().withNudge(ponderValence, alpha, currentTick);
+	AffectState nudged;
+	if ("eveningWind".equals(breakWindow)) {
+	    // Evening: wind down activation, boost social drive
+	    nudged = agent.getAffect().withEveningNudge(ponderValence, alpha,
+		memConfig.getEveningSocialBoost(), memConfig.getEveningActivationDamp(), currentTick);
+	} else {
+	    nudged = agent.getAffect().withNudge(ponderValence, alpha, currentTick);
+	}
 	agent.setAffect(nudged);
 
 	// Update ledger index
@@ -178,6 +185,9 @@ public class PonderService {
 	}
 	if (isWithinTimeWindow(rhythm.getAfternoonTea())) {
 	    return "afternoonTea";
+	}
+	if (isWithinTimeWindow(rhythm.getEveningWind())) {
+	    return "eveningWind";
 	}
 	return null;
     }

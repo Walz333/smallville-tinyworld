@@ -48,6 +48,7 @@ dailyRhythm:
   dinner: "18:00-20:30"
   morningTea: "06:00-10:00"
   afternoonTea: "15:00-17:30"
+  eveningWind: "19:30-21:30"
   snack: "Flexible morning or afternoon"
 
 memory:
@@ -60,6 +61,8 @@ memory:
   ponderEnabled: true
   ponderBlendAlpha: 0.6
   ponderCooldownTicks: 5
+  eveningSocialBoost: 0.2
+  eveningActivationDamp: 0.1
 
 agents:
   - name: "Jamie"

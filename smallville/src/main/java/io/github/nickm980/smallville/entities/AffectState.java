@@ -91,6 +91,28 @@ public class AffectState {
 			       this.focusTarget, this.drivers, tick);
     }
 
+    /**
+     * Create a nudged copy with evening-wind social modulation.
+     * In addition to valence blending, reduces activation (task wind-down)
+     * and boosts socialDrive (social availability before sleep).
+     *
+     * @param ponderValence the valence derived from the ponder cycle
+     * @param alpha         blend weight for the EXISTING affect (0..1)
+     * @param socialBoost   amount to add to socialDrive (typically 0.1-0.3)
+     * @param activationDamp amount to subtract from activation (typically 0.05-0.15)
+     * @param tick          the tick at which the nudge occurs
+     * @return a new AffectState with blended valence, boosted socialDrive, and damped activation
+     */
+    public AffectState withEveningNudge(double ponderValence, double alpha,
+					double socialBoost, double activationDamp, int tick) {
+	double blended = clamp(alpha * this.valence + (1.0 - alpha) * ponderValence, -1.0, 1.0);
+	double newActivation = clamp(this.activation - activationDamp, 0.0, 1.0);
+	double newSocialDrive = clamp(this.socialDrive + socialBoost, 0.0, 1.0);
+	String mood = moodFromValence(blended);
+	return new AffectState(mood, blended, newActivation, newSocialDrive,
+			       this.focusTarget, this.drivers, tick);
+    }
+
     // --- Getters ---
 
     public String getMoodLabel() {

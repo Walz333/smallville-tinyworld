@@ -3,6 +3,7 @@ package io.github.nickm980.smallville;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -134,6 +135,32 @@ public class PonderServiceTest {
 	assertTrue(ponderService.isWithinTimeWindow("00:00-23:59"), "Full-day window should always match");
 	assertFalse(ponderService.isWithinTimeWindow(null), "Null window should not match");
 	assertFalse(ponderService.isWithinTimeWindow("invalid"), "Invalid window should not match");
+    }
+
+    @Test
+    public void test_detectBreakWindow_eveningWind() {
+	SimulationTime.setSimulationTime(java.time.LocalDateTime.of(2026, 3, 22, 20, 0));
+	SimulationFile.DailyRhythmSeed rhythm = new SimulationFile.DailyRhythmSeed();
+	rhythm.setMorningTea("06:00-10:00");
+	rhythm.setLunch("12:00-14:00");
+	rhythm.setAfternoonTea("15:00-17:30");
+	rhythm.setEveningWind("19:30-21:30");
+
+	String window = ponderService.detectBreakWindow(rhythm);
+	assertEquals("eveningWind", window, "Should detect eveningWind at 20:00");
+    }
+
+    @Test
+    public void test_detectBreakWindow_null_eveningWind_skips() {
+	SimulationTime.setSimulationTime(java.time.LocalDateTime.of(2026, 3, 22, 20, 0));
+	SimulationFile.DailyRhythmSeed rhythm = new SimulationFile.DailyRhythmSeed();
+	rhythm.setMorningTea("06:00-10:00");
+	rhythm.setLunch("12:00-14:00");
+	rhythm.setAfternoonTea("15:00-17:30");
+	// eveningWind is null by default
+
+	String window = ponderService.detectBreakWindow(rhythm);
+	assertNull(window, "Should return null when no evening window matches at 20:00");
     }
 
     // --- Valence formula tests ---
@@ -269,6 +296,59 @@ public class PonderServiceTest {
 
 	assertEquals(0.7, agent.getAffect().getActivation(), 0.001,
 	    "Activation should be preserved during ponder");
+    }
+
+    // --- Evening wind integration ---
+
+    @Test
+    public void test_evening_ponder_boosts_socialDrive_and_damps_activation() {
+	SimulationTime.setSimulationTime(java.time.LocalDateTime.of(2026, 3, 22, 20, 0));
+
+	Agent agent = createAgent("Alice");
+	agent.setAffect(new AffectState("distressed", -0.78, 0.6, 0.1, null, List.of(), 1));
+	addObservationsWithImportance(agent, 3, 3);
+
+	SimulationFile.MemorySeed config = createPonderConfig(true);
+	config.setEveningSocialBoost(0.2);
+	config.setEveningActivationDamp(0.1);
+
+	SimulationFile.DailyRhythmSeed rhythm = new SimulationFile.DailyRhythmSeed();
+	rhythm.setEveningWind("19:30-21:30");
+	rhythm.setMorningTea("06:00-10:00");
+	rhythm.setLunch("12:00-14:00");
+	rhythm.setAfternoonTea("15:00-17:30");
+
+	boolean fired = ponderService.runPonder(agent, config, rhythm, 10, false);
+	assertTrue(fired, "Ponder should fire during eveningWind");
+
+	// SocialDrive should be boosted
+	assertEquals(0.3, agent.getAffect().getSocialDrive(), 0.001,
+	    "SocialDrive should be boosted by 0.2 during evening");
+	// Activation should be damped
+	assertEquals(0.5, agent.getAffect().getActivation(), 0.001,
+	    "Activation should be damped by 0.1 during evening");
+    }
+
+    @Test
+    public void test_morning_ponder_does_not_apply_social_boost() {
+	setSimTimeToBreakWindow(); // 09:00 — morningTea
+
+	Agent agent = createAgent("Alice");
+	agent.setAffect(new AffectState("uneasy", -0.3, 0.6, 0.1, null, List.of(), 1));
+	addObservationsWithImportance(agent, 3, 3);
+
+	SimulationFile.MemorySeed config = createPonderConfig(true);
+	config.setEveningSocialBoost(0.2);
+	config.setEveningActivationDamp(0.1);
+	SimulationFile.DailyRhythmSeed rhythm = createAllDayRhythm();
+
+	ponderService.runPonder(agent, config, rhythm, 10, false);
+
+	// Morning ponder uses standard withNudge — activation and socialDrive unchanged
+	assertEquals(0.6, agent.getAffect().getActivation(), 0.001,
+	    "Activation should be preserved during morning ponder");
+	assertEquals(0.1, agent.getAffect().getSocialDrive(), 0.001,
+	    "SocialDrive should be preserved during morning ponder");
     }
 
     // --- Helpers ---
