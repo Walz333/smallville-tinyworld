@@ -61,13 +61,15 @@ All five March 22 items dispositioned. Contract files confirmed as tracked activ
 The first meaningful response from the agent must include exactly these sections:
 
 ### Section 1: Active mission
-### Section 2: CTO authority loaded
-### Section 3: Source files and checkpoints loaded
-### Section 4: Current repo reality
-### Section 5: Current code understanding
-### Section 6: Deficient data still required
-### Section 7: Drift risks for this lane
-### Section 8: Bounded execution plan
+### Section 2: Northbridge authority loaded
+### Section 3: Repo-local source files loaded
+### Section 4: Public-fork refresh result
+### Section 5: Current local repo reality
+### Section 6: Current code / seam understanding
+### Section 7: Deficient data still required
+### Section 8: Drift risks for this lane
+### Section 9: Recommended bounded execution plan
+### Sub-Agent Ledger
 
 ## 7. Exact evidence request rule
 
