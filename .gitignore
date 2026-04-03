@@ -22,4 +22,5 @@ node_modules
 # Local workspace residue
 /tmp/
 /.codex-logs/
+/output/
 __pycache__/
