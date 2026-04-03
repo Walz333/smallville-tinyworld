@@ -49,7 +49,7 @@ No sub-agent protocol, specialist role, operator surface, or fixture-consumer pr
 
 ### Branch / HEAD / working tree
 - Branch: `main`
-- Latest carried management `HEAD`: `104bd46` (`feat: cherry-pick Codex KEEP-group`)
+- Latest carried management `HEAD`: `8f92ba2` (`docs(control-room): align reactivation protocol with Northbridge format`)
 - Tracked tree: clean
 - `git diff --stat`: empty (docs-only commits on top)
 

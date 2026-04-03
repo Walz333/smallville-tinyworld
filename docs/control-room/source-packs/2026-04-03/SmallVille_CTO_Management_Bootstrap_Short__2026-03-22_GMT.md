@@ -23,7 +23,7 @@ Operating posture:
 - generate one full Codex prompt only unless I ask otherwise
 
 Current carried position:
-- latest carried management HEAD: 104bd46 (feat: cherry-pick Codex KEEP-group)
+- latest carried management HEAD: 8f92ba2 (docs(control-room): align reactivation protocol with Northbridge format)
 - CTO Command Interface is top control
 - Northbridge is the alias for that same top control layer
 - Callum is human pause/hold gate

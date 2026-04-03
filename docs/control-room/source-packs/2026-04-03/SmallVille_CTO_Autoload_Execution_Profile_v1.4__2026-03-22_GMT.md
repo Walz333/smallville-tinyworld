@@ -130,7 +130,7 @@ Preferred outputs here are:
 
 The current carried management state should be treated as:
 - branch: `main`
-- latest carried management `HEAD`: `104bd46` (`feat: cherry-pick Codex KEEP-group`)
+- latest carried management `HEAD`: `8f92ba2` (`docs(control-room): align reactivation protocol with Northbridge format`)
 - bounded ask-shadow bridge seam is now frozen in repo history
 - sidecar-packet-assembler-v1 is frozen in repo history at `5f4e405`
 - Codex KEEP-group cherry-pick is frozen in repo history at `104bd46`

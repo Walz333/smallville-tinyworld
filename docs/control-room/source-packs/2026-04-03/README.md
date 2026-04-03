@@ -2,7 +2,7 @@
 
 This folder is the repo-local mirror of the active 2026-04-03 control-room source pack.
 
-Refreshed from the 2026-03-22 original. Updates: HEAD → `104bd46`, residue resolved, seam posture current.
+Refreshed from the 2026-03-22 original. Updates: HEAD → `8f92ba2`, residue resolved, seam posture current.
 
 Imported files retain original filenames.
 

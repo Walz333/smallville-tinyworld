@@ -15,7 +15,7 @@ Load authority from:
 
 Current carried position:
 - branch expected: main
-- latest carried management HEAD: 104bd46 (feat: cherry-pick Codex KEEP-group)
+- latest carried management HEAD: 8f92ba2 (docs(control-room): align reactivation protocol with Northbridge format)
 - tracked tree expected clean
 - March 22 residue fully resolved — no remaining workspace ambiguity
 - CTO Command Interface is top control

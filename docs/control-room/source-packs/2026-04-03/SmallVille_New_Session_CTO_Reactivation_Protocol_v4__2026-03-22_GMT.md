@@ -41,7 +41,7 @@ Bridge output remains non-authoritative unless a later lane explicitly changes t
 
 ### Carried management state
 - branch expected: `main`
-- current carried management `HEAD`: `104bd46` (`feat: cherry-pick Codex KEEP-group`)
+- current carried management `HEAD`: `8f92ba2` (`docs(control-room): align reactivation protocol with Northbridge format`)
 - tracked tree expected clean
 - ask-shadow bridge seam is frozen in repo history
 - sidecar-packet-assembler-v1 is frozen in repo history at `5f4e405`

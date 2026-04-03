@@ -30,7 +30,7 @@ Bridge outputs remain non-authoritative unless a later explicitly authorized lan
 
 ### Verified from latest carried repo report
 - Branch: `main`
-- Current carried `HEAD`: `104bd46` (`feat: cherry-pick Codex KEEP-group`)
+- Current carried `HEAD`: `8f92ba2` (`docs(control-room): align reactivation protocol with Northbridge format`)
 - Latest landed implementation commits:
   - `5f4e405` — `feat(sidecar): add sidecar-packet-assembler-v1`
   - `104bd46` — `feat: cherry-pick Codex KEEP-group`
