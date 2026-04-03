@@ -596,4 +596,70 @@ public class WorldSnapshotResponse {
 	    this.createdAtTick = createdAtTick;
 	}
     }
+
+    public static class GovernanceBlockRuleResponse {
+	private String id;
+	private String type;
+	private String parentLocation;
+	private String name;
+	private String targetLocation;
+	private String createdAtUtc;
+	private String reason;
+
+	public String getId() {
+	    return id;
+	}
+
+	public void setId(String id) {
+	    this.id = id;
+	}
+
+	public String getType() {
+	    return type;
+	}
+
+	public void setType(String type) {
+	    this.type = type;
+	}
+
+	public String getParentLocation() {
+	    return parentLocation;
+	}
+
+	public void setParentLocation(String parentLocation) {
+	    this.parentLocation = parentLocation;
+	}
+
+	public String getName() {
+	    return name;
+	}
+
+	public void setName(String name) {
+	    this.name = name;
+	}
+
+	public String getTargetLocation() {
+	    return targetLocation;
+	}
+
+	public void setTargetLocation(String targetLocation) {
+	    this.targetLocation = targetLocation;
+	}
+
+	public String getCreatedAtUtc() {
+	    return createdAtUtc;
+	}
+
+	public void setCreatedAtUtc(String createdAtUtc) {
+	    this.createdAtUtc = createdAtUtc;
+	}
+
+	public String getReason() {
+	    return reason;
+	}
+
+	public void setReason(String reason) {
+	    this.reason = reason;
+	}
+    }
 }
