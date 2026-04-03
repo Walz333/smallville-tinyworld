@@ -103,9 +103,21 @@ public class RuntimeSettingsService {
     }
 
     public String resolveModel(String agentName, String preferredModel) {
+	return resolveModel(agentName, preferredModel, null);
+    }
+
+    public String resolveModel(String agentName, String preferredModel, String aspect) {
 	String override = getAgentModelOverride(agentName);
 	if (override != null && !override.isBlank()) {
 	    return override;
+	}
+
+	if (aspect != null && !aspect.isBlank()) {
+	    String aspectModel = config.getModelForAspect(aspect);
+	    if (aspectModel != null && !aspectModel.isBlank()) {
+		LOG.debug("Aspect-routed model for [{}]: {} -> {}", agentName, aspect, aspectModel);
+		return aspectModel;
+	    }
 	}
 
 	if (preferredModel != null && !preferredModel.isBlank()) {

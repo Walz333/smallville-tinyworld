@@ -1,5 +1,8 @@
 package io.github.nickm980.smallville.config;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public class GeneralConfig {
 
     private String apiPath;
@@ -16,6 +19,7 @@ public class GeneralConfig {
     private int askShadowBridgeCallTimeoutMs;
     private boolean offlineMode;
     private boolean loopbackOnly;
+    private Map<String, String> modelRouting = new LinkedHashMap<>();
 
     public boolean isSimulationFile() {
 	return simulationFile;
@@ -127,6 +131,21 @@ public class GeneralConfig {
 
     public void setLoopbackOnly(boolean loopbackOnly) {
 	this.loopbackOnly = loopbackOnly;
+    }
+
+    public Map<String, String> getModelRouting() {
+	return modelRouting;
+    }
+
+    public void setModelRouting(Map<String, String> modelRouting) {
+	this.modelRouting = modelRouting != null ? modelRouting : new LinkedHashMap<>();
+    }
+
+    public String getModelForAspect(String aspect) {
+	if (aspect == null || modelRouting == null) {
+	    return null;
+	}
+	return modelRouting.get(aspect);
     }
 
 }

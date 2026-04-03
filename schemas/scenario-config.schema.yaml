@@ -29,6 +29,30 @@ properties:
     type: integer
     minimum: 0
     description: Maximum retry count for model calls.
+  modelRouting:
+    type: object
+    description: Optional per-aspect model assignments. Keys are aspect names, values are model tags. When set, each intelligence aspect uses its designated model instead of the scenario default.
+    additionalProperties:
+      type: string
+    properties:
+      memoryRanking:
+        type: string
+        description: Model for memory weight scoring (structured numeric output, low temperature).
+      longTermPlanning:
+        type: string
+        description: Model for full-day plan generation (benefits from long context).
+      shortTermPlanning:
+        type: string
+        description: Model for hourly plan breakdown.
+      activity:
+        type: string
+        description: Model for current activity and location selection (structured JSON output).
+      conversation:
+        type: string
+        description: Model for dialogue generation and conversational responses.
+      reflection:
+        type: string
+        description: Model for meta-cognitive reflection and insight synthesis (benefits from long context).
 required:
   - apiPath
   - model

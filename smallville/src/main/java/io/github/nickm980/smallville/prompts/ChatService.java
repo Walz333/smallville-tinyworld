@@ -77,9 +77,13 @@ public class ChatService implements Prompts {
     }
 
     private PromptRequest buildPrompt(Agent agent, PromptBuilder builder, String promptText) {
+	return buildPrompt(agent, builder, promptText, null);
+    }
+
+    private PromptRequest buildPrompt(Agent agent, PromptBuilder builder, String promptText, String aspect) {
 	PromptRequest request = builder.setPrompt(promptText).build();
 	if (agent != null) {
-	    request.setModel(runtimeSettings.resolveModel(agent.getFullName(), agent.getModel()));
+	    request.setModel(runtimeSettings.resolveModel(agent.getFullName(), agent.getModel(), aspect));
 	}
 	return request;
     }
@@ -88,7 +92,7 @@ public class ChatService implements Prompts {
     public int[] getWeights(Agent agent) {
 	PromptRequest prompt = buildPrompt(agent, builder()
 	    .withAgent(agent)
-	    , SmallvilleConfig.getPrompts().getMisc().getRankMemories());
+	    , SmallvilleConfig.getPrompts().getMisc().getRankMemories(), "memoryRanking");
 
 	String response = chat.sendChat(prompt, .1);
 	response = response.replace(",]", "]");
@@ -118,7 +122,7 @@ public class ChatService implements Prompts {
 	    .withQuestion(question)
 	    .withLocations(world.getLocations())
 	    .withAgent(agent)
-	    , SmallvilleConfig.getPrompts().getAgent().getAskQuestion());
+	    , SmallvilleConfig.getPrompts().getAgent().getAskQuestion(), "conversation");
 
 	return chat.sendChat(prompt, .5);
     }
@@ -130,7 +134,7 @@ public class ChatService implements Prompts {
 	    .withObservation(agent.getMemoryStream().getLastObservation().getDescription())
 	    .withAgent(agent)
 	    .withWorld(world, simulationSeed)
-	    , SmallvilleConfig.getPrompts().getPlans().getLongTerm());
+	    , SmallvilleConfig.getPrompts().getPlans().getLongTerm(), "longTermPlanning");
 
 	String response = chat.sendChat(prompt, .4);
 	return parsePlans(response);
@@ -143,7 +147,7 @@ public class ChatService implements Prompts {
 	    .withObservation(agent.getMemoryStream().getLastObservation().getDescription())
 	    .withAgent(agent)
 	    .withWorld(world, simulationSeed)
-	    , SmallvilleConfig.getPrompts().getPlans().getShortTerm());
+	    , SmallvilleConfig.getPrompts().getPlans().getShortTerm(), "shortTermPlanning");
 
 	String response = chat.sendChat(prompt, .4);
 
@@ -156,7 +160,7 @@ public class ChatService implements Prompts {
 	    .withAgent(agent)
 	    .withWorld(world, simulationSeed)
 	    .withLocations(world.getLocations())
-	    , SmallvilleConfig.getPrompts().getPlans().getCurrent());
+	    , SmallvilleConfig.getPrompts().getPlans().getCurrent(), "activity");
 
 	String response = chat.sendChat(prompt, .5);
 
@@ -179,7 +183,7 @@ public class ChatService implements Prompts {
 	    .withAgent(agent)
 	    .withOther(other)
 	    .withObservation(topic)
-	    , SmallvilleConfig.getPrompts().getReactions().getConversation());
+	    , SmallvilleConfig.getPrompts().getReactions().getConversation(), "conversation");
 
 	String response = chat.sendChat(prompt, .7);
 	if (response == null || response.isBlank()) {
@@ -361,7 +365,7 @@ public class ChatService implements Prompts {
 	PromptRequest tensesPrompt = buildPrompt(agent, builder()
 	    .withAgent(agent)
 	    .withWorld(world, simulationSeed)
-	    , SmallvilleConfig.getPrompts().getMisc().getCombineSentences()); // might be able to use LocalNLP for this
+	    , SmallvilleConfig.getPrompts().getMisc().getCombineSentences(), "activity");
 
 	String tenses = chat.sendChat(tensesPrompt, .1);
 
@@ -370,7 +374,7 @@ public class ChatService implements Prompts {
 	    .withTense(tenses)
 	    .withWorld(world, simulationSeed)
 	    .withLocations(world.getLocations())
-	    , SmallvilleConfig.getPrompts().getWorld().getObjectStates());
+	    , SmallvilleConfig.getPrompts().getWorld().getObjectStates(), "activity");
 
 	String response = chat.sendChat(changedPrompt, .3);
 
@@ -412,7 +416,7 @@ public class ChatService implements Prompts {
 	Reflection reflection = new Reflection("");
 	PromptRequest prompt = buildPrompt(agent, builder()
 	    .withAgent(agent)
-	    , SmallvilleConfig.getPrompts().getAgent().getReflectionQuestion());
+	    , SmallvilleConfig.getPrompts().getAgent().getReflectionQuestion(), "reflection");
 
 	String query = chat.sendChat(prompt, .1);
 	String[] lines = query.split("\n");
@@ -429,7 +433,7 @@ public class ChatService implements Prompts {
 	PromptRequest secondPrompt = buildPrompt(agent, builder()
 	    .withAgent(agent)
 	    .withStatements(memories.stream().map(m -> m.getDescription()).collect(Collectors.toList()))
-	    , SmallvilleConfig.getPrompts().getAgent().getReflectionResult());
+	    , SmallvilleConfig.getPrompts().getAgent().getReflectionResult(), "reflection");
 
 	String description = chat.sendChat(secondPrompt, .8);
 
@@ -452,7 +456,7 @@ public class ChatService implements Prompts {
 	PromptRequest prompt = buildPrompt(agent, builder()
 	    .withObservation(observation)
 	    .withAgent(agent)
-	    , SmallvilleConfig.getPrompts().getReactions().getReaction());
+	    , SmallvilleConfig.getPrompts().getReactions().getReaction(), "activity");
 
 	String response = chat.sendChat(prompt, .2);
 	Reaction result = Util.parseAsClass(response, Reaction.class);
@@ -475,7 +479,7 @@ public class ChatService implements Prompts {
     public String createTraits(Agent agent) {
 	PromptRequest prompt = buildPrompt(agent, builder()
 	    .withAgent(agent)
-	    , SmallvilleConfig.getPrompts().getAgent().getCharacteristics());
+	    , SmallvilleConfig.getPrompts().getAgent().getCharacteristics(), "reflection");
 
 	return chat.sendChat(prompt, .5);
     }
@@ -485,7 +489,7 @@ public class ChatService implements Prompts {
 	PromptRequest request = buildPrompt(agent, builder()
 	    .withObservation(observation)
 	    .withAgent(agent)
-	    , SmallvilleConfig.getPrompts().getReactions().getSay());
+	    , SmallvilleConfig.getPrompts().getReactions().getSay(), "conversation");
 	
 	String result = chat.sendChat(request, .5);
 	
@@ -502,7 +506,7 @@ public class ChatService implements Prompts {
 	    .withAgent(agent)
 	    .withWorld(world, simulationSeed)
 	    .withLocations(world.getLocations())
-	    , SmallvilleConfig.getPrompts().getWorld().getProposal());
+	    , SmallvilleConfig.getPrompts().getWorld().getProposal(), "activity");
 
 	String response = chat.sendChat(request, .2);
 	WorldProposalCandidate candidate = parseWorldProposal(response);
