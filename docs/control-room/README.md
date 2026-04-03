@@ -2,6 +2,8 @@
 
 This file is the repo-local entrypoint for control-room bootstrap.
 
+The master activation source for fresh-session loading and control-room alignment is `docs/control-room/Northbridge_Main_Activation_Protocol_v1__2026-04-03_GMT.md`.
+
 The active repo-local source-pack mirror is `docs/control-room/source-packs/2026-04-03/README.md`.
 
 The current optional activation-consideration pack is `docs/control-room/activation-considerations/2026-04-03/README.md`.

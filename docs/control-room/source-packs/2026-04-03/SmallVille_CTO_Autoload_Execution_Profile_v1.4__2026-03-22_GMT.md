@@ -198,13 +198,17 @@ For a fresh session, the agent must operate in this order:
 The first meaningful response in a fresh session should include these sections:
 
 ### Section 1: Active mission
-### Section 2: CTO authority loaded
-### Section 3: Source files and checkpoints loaded
-### Section 4: Current repo reality
-### Section 5: Current code understanding
-### Section 6: Deficient data still required
-### Section 7: Drift risks for this lane
-### Section 8: Bounded execution plan
+### Section 2: Northbridge authority loaded
+### Section 3: Repo-local source files loaded
+### Section 4: Public-fork refresh result
+### Section 5: Current local repo reality
+### Section 6: Current code / seam understanding
+### Section 7: Deficient data still required
+### Section 8: Drift risks for this lane
+### Section 9: Recommended bounded execution plan
+### Sub-Agent Ledger
+
+Each section should include the evidence-split labels defined in Section 16 (Verified / Inferred / Missing / Blocked).
 
 ## 16. Required reporting split
 
